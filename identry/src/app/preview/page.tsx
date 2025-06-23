@@ -35,8 +35,6 @@ interface ProfileData {
 
 export default function PreviewPage() {
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
-  const [shareUrl, setShareUrl] = useState('');
-  const [showShareModal, setShowShareModal] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -74,27 +72,7 @@ export default function PreviewPage() {
       };
       setProfileData(defaultData);
     }
-    
-    // 仮の共有URLを生成
-    setShareUrl(`https://identry.com/p/${generateTempId()}`);
   }, []);
-
-  const generateTempId = () => {
-    return Math.random().toString(36).substr(2, 9);
-  };
-
-  const handleShare = () => {
-    setShowShareModal(true);
-  };
-
-  const copyToClipboard = async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      alert('URLをクリップボードにコピーしました！');
-    } catch (err) {
-      console.error('コピーに失敗しました:', err);
-    }
-  };
 
   const handlePublish = () => {
     // プロフィールを公開する場合は、ログインページに遷移してデータベースに保存
@@ -125,18 +103,12 @@ export default function PreviewPage() {
             <span className="text-xl font-bold text-black">IDentry</span>
           </Link>
           <div className="flex items-center space-x-4">
-            <Link 
+            <Link
               href="/create"
               className="text-gray-600 hover:text-black transition-colors"
             >
               ← 編集に戻る
             </Link>
-            <button
-              onClick={handleShare}
-              className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors"
-            >
-              🔗 シェア
-            </button>
             <button
               onClick={handlePublish}
               className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
@@ -329,49 +301,6 @@ export default function PreviewPage() {
           </div>
         </div>
       </div>
-
-      {/* シェアモーダル */}
-      {showShareModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full">
-            <div className="text-center mb-6">
-              <div className="text-4xl mb-4">🔗</div>
-              <h2 className="text-2xl font-bold text-black mb-2">プロフィールをシェア</h2>
-              <p className="text-gray-600">このURLでプロフィールを共有できます</p>
-            </div>
-            
-            <div className="bg-gray-50 rounded-lg p-4 mb-4">
-              <div className="flex items-center space-x-2">
-                <input
-                  type="text"
-                  value={shareUrl}
-                  readOnly
-                  className="flex-1 bg-transparent text-sm text-gray-700 outline-none"
-                />
-                <button
-                  onClick={copyToClipboard}
-                  className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
-                >
-                  コピー
-                </button>
-              </div>
-            </div>
-            
-            <div className="text-center space-y-3">
-              <p className="text-sm text-gray-500">
-                ⚠️ このURLは一時的なものです。<br />
-                公開すると正式なURLが発行されます。
-              </p>
-              <button
-                onClick={() => setShowShareModal(false)}
-                className="w-full bg-gray-100 text-gray-700 py-2 rounded-lg hover:bg-gray-200"
-              >
-                閉じる
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
