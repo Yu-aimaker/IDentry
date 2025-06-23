@@ -1,11 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 interface FormData {
   name: string;
+  birthYear: string;
+  birthMonth: string;
+  birthDay: string;
+  birthDate: string;
+  gender: string;
+  address: string;
   photo: string;
   bio: string;
   twitter: string;
@@ -32,20 +38,28 @@ interface FormData {
 }
 
 const steps = [
-  { id: 1, title: '基本情報', emoji: '🧱', reward: '基本ブロック完成' },
-  { id: 2, title: '自己紹介', emoji: '🗣', reward: '自己紹介ブロック完成' },
-  { id: 3, title: 'SNSリンク', emoji: '🔗', reward: 'つながりブロック完成' },
-  { id: 4, title: 'スキル', emoji: '💡', reward: 'スキルブロック完成' },
-  { id: 5, title: '学歴', emoji: '🎓', reward: '学歴ブロック完成' },
-  { id: 6, title: '経歴', emoji: '🏢', reward: 'キャリアブロック完成' },
-  { id: 7, title: 'ポートフォリオ', emoji: '🌟', reward: 'ポートフォリオブロック完成' }
+  { id: 1, title: '名前', emoji: '😎' },
+  { id: 2, title: '生年月日', emoji: '📅' },
+  { id: 3, title: '性別', emoji: '⚧' },
+  { id: 4, title: '住所', emoji: '🏠' },
+  { id: 5, title: '学歴', emoji: '🎓' },
+  { id: 6, title: '職歴', emoji: '🏢' },
+  { id: 7, title: 'SNSリンク', emoji: '🔗' },
+  { id: 8, title: 'スキル', emoji: '💡' },
+  { id: 9, title: 'ポートフォリオ', emoji: '🌟' },
+  { id: 10, title: '自己紹介', emoji: '💬' }
 ];
 
 export default function CreatePage() {
   const [currentStep, setCurrentStep] = useState(1);
-  const [showReward, setShowReward] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     name: '',
+    birthYear: '',
+    birthMonth: '',
+    birthDay: '',
+    birthDate: '',
+    gender: '',
+    address: '',
     photo: '',
     bio: '',
     twitter: '',
@@ -59,28 +73,29 @@ export default function CreatePage() {
   });
   const router = useRouter();
 
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleNext();
+    }
+  };
+
   const handleNext = () => {
     // バリデーション
     if (currentStep === 1 && !formData.name) {
       alert('名前を入力してください');
       return;
     }
-    if (currentStep === 2 && !formData.bio) {
+    if (currentStep === 10 && !formData.bio) {
       alert('自己紹介を入力してください');
       return;
     }
 
-    // 報酬アニメーション表示
-    setShowReward(true);
-    setTimeout(() => {
-      setShowReward(false);
-      if (currentStep < 7) {
-        setCurrentStep(currentStep + 1);
-      } else {
-        // 全ステップ完了時にプレビューページへ
-        router.push('/preview');
-      }
-    }, 2000);
+    if (currentStep < 10) {
+      setCurrentStep(currentStep + 1);
+    } else {
+      // 全ステップ完了時にプレビューページへ
+      router.push('/preview');
+    }
   };
 
   const handlePrev = () => {
@@ -89,8 +104,45 @@ export default function CreatePage() {
     }
   };
 
+  const handleStepClick = (stepId: number) => {
+    setCurrentStep(stepId);
+  };
+
   const updateFormData = (field: keyof FormData, value: string | string[] | FormData[keyof FormData]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleDateChange = (dateValue: string) => {
+    if (dateValue) {
+      const date = new Date(dateValue);
+      const year = date.getFullYear().toString();
+      const month = (date.getMonth() + 1).toString();
+      const day = date.getDate().toString();
+      
+      setFormData(prev => ({
+        ...prev,
+        birthDate: dateValue,
+        birthYear: year,
+        birthMonth: month,
+        birthDay: day
+      }));
+    }
+  };
+
+  const handleSelectChange = (field: 'birthYear' | 'birthMonth' | 'birthDay', value: string) => {
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value };
+      
+      // 年月日が全て入力されている場合、日付文字列も更新
+      if (updated.birthYear && updated.birthMonth && updated.birthDay) {
+        const year = updated.birthYear;
+        const month = updated.birthMonth.padStart(2, '0');
+        const day = updated.birthDay.padStart(2, '0');
+        updated.birthDate = `${year}-${month}-${day}`;
+      }
+      
+      return updated;
+    });
   };
 
   const addArrayItem = (field: 'education' | 'career' | 'portfolio', item: FormData['education'][0] | FormData['career'][0] | FormData['portfolio'][0]) => {
@@ -101,69 +153,60 @@ export default function CreatePage() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white" onKeyDown={handleKeyPress}>
       {/* ヘッダー */}
       <header className="border-b border-gray-100">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg">ID</span>
-            </div>
-            <span className="text-xl font-bold text-black">IDentry</span>
-          </Link>
-          <div className="text-sm text-gray-500">
-            ステップ {currentStep}/7
-          </div>
+        <div className="max-w-4xl mx-auto px-4 py-6 flex justify-center">
+          <Image
+            src="/img/banner.png"
+            alt="IDentry Banner"
+            width={200}
+            height={80}
+            className="h-15 object-contain"
+          />
         </div>
       </header>
 
-      {/* プログレスバー */}
-      <div className="max-w-4xl mx-auto px-4 py-4">
-        <div className="w-full bg-gray-200 rounded-full h-2">
-          <div 
-            className="bg-blue-600 h-2 rounded-full transition-all duration-500"
-            style={{ width: `${(currentStep / 7) * 100}%` }}
-          ></div>
-        </div>
-      </div>
 
       {/* ステップインジケーター */}
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        <div className="flex justify-center space-x-4 overflow-x-auto">
+      <div className="max-w-6xl mx-auto px-4 py-6">
+        <div className="grid grid-cols-5 md:grid-cols-10 gap-3 mb-6">
           {steps.map((step) => (
-            <div 
+            <div
               key={step.id}
-              className={`flex flex-col items-center space-y-2 min-w-0 ${
-                step.id <= currentStep ? 'opacity-100' : 'opacity-50'
+              onClick={() => handleStepClick(step.id)}
+              className={`flex flex-col items-center justify-center space-y-2 p-4 rounded-xl transition-all duration-300 min-h-[80px] cursor-pointer hover:scale-105 ${
+                step.id < currentStep
+                  ? 'bg-green-50 border-2 border-green-200 shadow-sm hover:bg-green-100 hover:border-green-300'
+                  : step.id === currentStep
+                    ? 'bg-blue-50 border-2 border-blue-300 shadow-md scale-105'
+                    : 'bg-gray-50 border border-gray-200 opacity-60 hover:opacity-80 hover:bg-gray-100'
               }`}
             >
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl ${
-                step.id < currentStep ? 'bg-green-100' : 
-                step.id === currentStep ? 'bg-blue-100' : 'bg-gray-100'
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-medium transition-all duration-300 ${
+                step.id < currentStep
+                  ? 'bg-green-500 text-white shadow-lg'
+                  : step.id === currentStep
+                    ? 'bg-blue-500 text-white shadow-lg animate-pulse'
+                    : 'bg-gray-300 text-gray-500'
               }`}>
-                {step.id < currentStep ? '✅' : step.emoji}
+                {step.id < currentStep ? '✓' : step.emoji}
               </div>
-              <span className="text-xs text-gray-600 text-center">{step.title}</span>
+              <div className="text-center">
+                <div className={`text-xs font-bold ${
+                  step.id <= currentStep ? 'text-gray-800' : 'text-gray-500'
+                }`}>
+                  {step.title}
+                </div>
+              </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* 報酬アニメーション */}
-      {showReward && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-8 text-center animate-bounce">
-            <div className="text-6xl mb-4">{steps[currentStep - 1].emoji}</div>
-            <h2 className="text-2xl font-bold text-black mb-2">
-              {steps[currentStep - 1].reward}！
-            </h2>
-            <p className="text-gray-600">素晴らしい！次のブロックに進みましょう</p>
-          </div>
-        </div>
-      )}
 
       {/* メインコンテンツ */}
-      <div className="max-w-2xl mx-auto px-4 py-8">
+      <div className="max-w-2xl mx-auto px-4 py-8 pb-32">
         <div className="bg-white rounded-2xl border border-gray-100 p-8">
           <div className="text-center mb-8">
             <div className="text-4xl mb-4">{steps[currentStep - 1].emoji}</div>
@@ -171,65 +214,189 @@ export default function CreatePage() {
               {steps[currentStep - 1].title}
             </h1>
             <p className="text-gray-600">
-              {currentStep === 1 && "あなたの基本情報を入力してください"}
-              {currentStep === 2 && "120文字以内で自己紹介を書いてください"}
-              {currentStep === 3 && "SNSアカウントを教えてください（任意）"}
-              {currentStep === 4 && "あなたのスキルをタグで追加してください"}
+              {currentStep === 1 && "お名前を入力してください"}
+              {currentStep === 2 && "生年月日を入力してください"}
+              {currentStep === 3 && "性別を選択してください"}
+              {currentStep === 4 && "現在の住所を入力してください（任意）"}
               {currentStep === 5 && "学歴を入力してください（任意）"}
               {currentStep === 6 && "職歴を入力してください（任意）"}
-              {currentStep === 7 && "ポートフォリオ作品を追加してください（任意）"}
+              {currentStep === 7 && "SNSアカウントを教えてください（任意）"}
+              {currentStep === 8 && "あなたのスキルをタグで追加してください"}
+              {currentStep === 9 && "ポートフォリオ作品を追加してください（任意）"}
+              {currentStep === 10 && "120文字以内で自己紹介を書いてください"}
             </p>
           </div>
 
-          {/* ステップ1: 基本情報 */}
+          {/* ステップ1: 名前 */}
           {currentStep === 1 && (
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-black mb-2">
-                  お名前 *
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => updateFormData('name', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                  placeholder="山田太郎"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-black mb-2">
-                  プロフィール写真URL（任意）
-                </label>
-                <input
-                  type="url"
-                  value={formData.photo}
-                  onChange={(e) => updateFormData('photo', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                  placeholder="https://example.com/photo.jpg"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* ステップ2: 自己紹介 */}
-          {currentStep === 2 && (
             <div>
               <label className="block text-sm font-medium text-black mb-2">
-                自己紹介 * ({formData.bio.length}/120)
+                お名前 *
               </label>
-              <textarea
-                value={formData.bio}
-                onChange={(e) => updateFormData('bio', e.target.value)}
-                maxLength={120}
-                rows={4}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent resize-none"
-                placeholder="フロントエンドエンジニアとして3年の経験があります。ReactやNext.jsを使った開発が得意で、ユーザビリティを重視したWebアプリケーション開発に情熱を注いでいます。"
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => updateFormData('name', e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleNext()}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                placeholder="山田太郎"
+                autoFocus
               />
             </div>
           )}
 
-          {/* ステップ3: SNSリンク */}
+          {/* ステップ2: 生年月日 */}
+          {currentStep === 2 && (
+            <div className="space-y-4">
+              <label className="block text-sm font-medium text-black mb-4">
+                生年月日
+              </label>
+              
+              {/* 年月日の個別選択 */}
+              <div className="grid grid-cols-3 gap-4">
+                {/* 年 */}
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">年</label>
+                  <select
+                    value={formData.birthYear}
+                    onChange={(e) => handleSelectChange('birthYear', e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleNext()}
+                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                    autoFocus
+                  >
+                    <option value="">----</option>
+                    {Array.from({ length: 100 }, (_, i) => {
+                      const year = new Date().getFullYear() - i;
+                      return (
+                        <option key={year} value={year}>
+                          {year}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+                
+                {/* 月 */}
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">月</label>
+                  <select
+                    value={formData.birthMonth}
+                    onChange={(e) => handleSelectChange('birthMonth', e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleNext()}
+                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                  >
+                    <option value="">--</option>
+                    {Array.from({ length: 12 }, (_, i) => (
+                      <option key={i + 1} value={i + 1}>
+                        {i + 1}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                {/* 日 */}
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">日</label>
+                  <select
+                    value={formData.birthDay}
+                    onChange={(e) => handleSelectChange('birthDay', e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleNext()}
+                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                  >
+                    <option value="">--</option>
+                    {Array.from({ length: 31 }, (_, i) => (
+                      <option key={i + 1} value={i + 1}>
+                        {i + 1}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
+              {/* カレンダー選択 */}
+              <div className="mt-6">
+                <div className="flex items-center space-x-3">
+                  <span className="text-sm text-gray-600">または</span>
+                  <div className="flex-1 h-px bg-gray-200"></div>
+                </div>
+                <div className="mt-3 flex items-center space-x-3">
+                  <span className="text-sm text-gray-600">📅</span>
+                  <input
+                    type="date"
+                    value={formData.birthDate}
+                    onChange={(e) => handleDateChange(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleNext()}
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                    placeholder="カレンダーから選択"
+                  />
+                  <span className="text-xs text-gray-500">カレンダーで選択</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ステップ3: 性別 */}
           {currentStep === 3 && (
+            <div>
+              <label className="block text-sm font-medium text-black mb-4">
+                性別
+              </label>
+              <div className="space-y-3">
+                {['男性', '女性', 'その他'].map((option, index) => (
+                  <label key={option} className="flex items-center space-x-3 p-3 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="gender"
+                      value={option}
+                      checked={formData.gender === option}
+                      onChange={(e) => updateFormData('gender', e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleNext()}
+                      className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                      autoFocus={index === 0}
+                    />
+                    <span className="text-gray-700">{option}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ステップ4: 住所 */}
+          {currentStep === 4 && (
+            <div>
+              <label className="block text-sm font-medium text-black mb-2">
+                住所（任意）
+              </label>
+              <input
+                type="text"
+                value={formData.address}
+                onChange={(e) => updateFormData('address', e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleNext()}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                placeholder="東京都渋谷区"
+                autoFocus
+              />
+            </div>
+          )}
+
+          {/* ステップ5: 学歴 */}
+          {currentStep === 5 && (
+            <EducationInput
+              education={formData.education}
+              addEducation={(item) => addArrayItem('education', item)}
+            />
+          )}
+
+          {/* ステップ6: 職歴 */}
+          {currentStep === 6 && (
+            <CareerInput
+              career={formData.career}
+              addCareer={(item) => addArrayItem('career', item)}
+            />
+          )}
+
+          {/* ステップ7: SNSリンク */}
+          {currentStep === 7 && (
             <div className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-black mb-2">
@@ -239,8 +406,10 @@ export default function CreatePage() {
                   type="text"
                   value={formData.twitter}
                   onChange={(e) => updateFormData('twitter', e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleNext()}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
                   placeholder="@username"
+                  autoFocus
                 />
               </div>
               <div>
@@ -251,6 +420,7 @@ export default function CreatePage() {
                   type="text"
                   value={formData.instagram}
                   onChange={(e) => updateFormData('instagram', e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleNext()}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
                   placeholder="@username"
                 />
@@ -263,6 +433,7 @@ export default function CreatePage() {
                   type="url"
                   value={formData.linkedin}
                   onChange={(e) => updateFormData('linkedin', e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleNext()}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
                   placeholder="https://linkedin.com/in/username"
                 />
@@ -275,6 +446,7 @@ export default function CreatePage() {
                   type="text"
                   value={formData.github}
                   onChange={(e) => updateFormData('github', e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleNext()}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
                   placeholder="username"
                 />
@@ -282,36 +454,39 @@ export default function CreatePage() {
             </div>
           )}
 
-          {/* ステップ4: スキル */}
-          {currentStep === 4 && (
-            <SkillsInput 
+          {/* ステップ8: スキル */}
+          {currentStep === 8 && (
+            <SkillsInput
               skills={formData.skills}
               updateSkills={(skills) => updateFormData('skills', skills)}
             />
           )}
 
-          {/* ステップ5: 学歴 */}
-          {currentStep === 5 && (
-            <EducationInput 
-              education={formData.education}
-              addEducation={(item) => addArrayItem('education', item)}
-            />
-          )}
-
-          {/* ステップ6: 経歴 */}
-          {currentStep === 6 && (
-            <CareerInput 
-              career={formData.career}
-              addCareer={(item) => addArrayItem('career', item)}
-            />
-          )}
-
-          {/* ステップ7: ポートフォリオ */}
-          {currentStep === 7 && (
-            <PortfolioInput 
+          {/* ステップ9: ポートフォリオ */}
+          {currentStep === 9 && (
+            <PortfolioInput
               portfolio={formData.portfolio}
               addPortfolio={(item) => addArrayItem('portfolio', item)}
             />
+          )}
+
+          {/* ステップ10: 自己紹介 */}
+          {currentStep === 10 && (
+            <div>
+              <label className="block text-sm font-medium text-black mb-2">
+                自己紹介 * ({formData.bio.length}/120)
+              </label>
+              <textarea
+                value={formData.bio}
+                onChange={(e) => updateFormData('bio', e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && e.ctrlKey && handleNext()}
+                maxLength={120}
+                rows={4}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent resize-none"
+                placeholder="フロントエンドエンジニアとして3年の経験があります。ReactやNext.jsを使った開発が得意で、ユーザビリティを重視したWebアプリケーション開発に情熱を注いでいます。（Ctrl+Enterで次へ）"
+                autoFocus
+              />
+            </div>
           )}
 
           {/* ナビゲーションボタン */}
@@ -331,8 +506,52 @@ export default function CreatePage() {
               onClick={handleNext}
               className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
             >
-              {currentStep === 7 ? 'プレビューを見る →' : '次へ →'}
+              {currentStep === 10 ? 'プレビューを見る →' : '次へ →'}
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 最下部の固定プログレスバー */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          {/* ランナーアイコンとトラック */}
+          <div className="relative mb-4">
+            {/* トラック背景 */}
+            <div className="w-full bg-gray-100 rounded-full h-3 shadow-inner">
+              <div
+                className="bg-gradient-to-r from-blue-500 to-indigo-600 h-3 rounded-full transition-all duration-700 ease-out relative"
+                style={{ width: `${(currentStep / 10) * 100}%` }}
+              >
+                {/* サブトルな光沢効果 */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent rounded-full"></div>
+              </div>
+            </div>
+            
+            {/* ランナーアイコン */}
+            <div
+              className="absolute -top-4 transform transition-all duration-700 ease-out"
+              style={{ left: `calc(${(currentStep / 10) * 100}% - 24px)` }}
+            >
+              <div className="w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center border-2 border-blue-500 hover:scale-110 transition-transform duration-300">
+                <span className="text-2xl animate-pulse">🚀</span>
+              </div>
+            </div>
+          </div>
+          
+          {/* スタートとゴールのラベル */}
+          <div className="flex justify-between items-center text-sm font-medium">
+            <div className="flex items-center space-x-2 text-slate-600">
+              <span className="text-base">🏁</span>
+              <span>スタート</span>
+            </div>
+            <div className="text-slate-700 font-semibold">
+              {Math.round((currentStep / 10) * 100)}% 完了
+            </div>
+            <div className="flex items-center space-x-2 text-slate-600">
+              <span>ゴール</span>
+              <span className="text-base">🏁</span>
+            </div>
           </div>
         </div>
       </div>
