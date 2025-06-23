@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '../../../lib/auth-context';
+import { getFormDataLocally, clearFormDataLocally, createProfile, addEducation, addCareer, addPortfolio } from '../../../lib/supabase';
 
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -11,17 +13,78 @@ export default function LoginPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { signIn, signUp, signInWithGoogle } = useAuth();
 
-  const handleGoogleLogin = () => {
-    setIsLoading(true);
-    // 実際のアプリでは、Google OAuth実装
-    setTimeout(() => {
-      alert('Googleログインが成功しました！');
-      router.push('/dashboard');
-    }, 1500);
+  // フォームデータをデータベースに保存する関数
+  const saveFormDataToDatabase = async () => {
+    const formData = getFormDataLocally();
+    if (!formData) return;
+
+    try {
+      // プロフィール作成
+      const profile = await createProfile({
+        name: formData.name || '',
+        birth_year: formData.birthYear || '',
+        birth_month: formData.birthMonth || '',
+        birth_day: formData.birthDay || '',
+        birth_date: formData.birthDate || '',
+        gender: formData.gender || '',
+        address: formData.address || '',
+        photo: formData.photo || '',
+        bio: formData.bio || '',
+        twitter: formData.twitter || '',
+        instagram: formData.instagram || '',
+        linkedin: formData.linkedin || '',
+        github: formData.github || '',
+        skills: formData.skills || []
+      });
+
+      // 学歴を追加
+      if (formData.education && Array.isArray(formData.education)) {
+        for (const edu of formData.education) {
+          await addEducation(profile.id, edu);
+        }
+      }
+
+      // 職歴を追加
+      if (formData.career && Array.isArray(formData.career)) {
+        for (const car of formData.career) {
+          await addCareer(profile.id, car);
+        }
+      }
+
+      // ポートフォリオを追加
+      if (formData.portfolio && Array.isArray(formData.portfolio)) {
+        for (const port of formData.portfolio) {
+          await addPortfolio(profile.id, port);
+        }
+      }
+
+      // ローカルストレージをクリア
+      clearFormDataLocally();
+    } catch (error) {
+      console.error('フォームデータ保存エラー:', error);
+    }
   };
 
-  const handleEmailAuth = (e: React.FormEvent) => {
+  const handleGoogleLogin = async () => {
+    try {
+      setIsLoading(true);
+      await signInWithGoogle();
+      
+      // フォームデータが保存されている場合、データベースに保存
+      await saveFormDataToDatabase();
+      
+      router.push('/dashboard');
+    } catch (error) {
+      console.error('Googleログインエラー:', error);
+      alert('Googleログインに失敗しました。');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!email || !password) {
@@ -34,17 +97,27 @@ export default function LoginPage() {
       return;
     }
 
-    setIsLoading(true);
-    
-    // 実際のアプリでは、認証API呼び出し
-    setTimeout(() => {
+    try {
+      setIsLoading(true);
+      
       if (isLogin) {
+        await signIn(email, password);
         alert('ログインが成功しました！');
       } else {
-        alert('アカウント作成が完了しました！');
+        await signUp(email, password);
+        alert('アカウント作成が完了しました！確認メールを送信しました。');
       }
+
+      // フォームデータが保存されている場合、データベースに保存
+      await saveFormDataToDatabase();
+      
       router.push('/dashboard');
-    }, 1500);
+    } catch (error) {
+      console.error('認証エラー:', error);
+      alert(isLogin ? 'ログインに失敗しました。' : 'アカウント作成に失敗しました。');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

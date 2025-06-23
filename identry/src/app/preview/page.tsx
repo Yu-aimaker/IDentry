@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { getFormDataLocally, clearFormDataLocally } from '../../../lib/supabase';
 
 interface ProfileData {
   name: string;
@@ -39,41 +40,41 @@ export default function PreviewPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // 実際のアプリでは、ローカルストレージまたはAPIからデータを取得
-    const mockData: ProfileData = {
-      name: '山田太郎',
-      photo: '',
-      bio: 'フロントエンドエンジニアとして3年の経験があります。ReactやNext.jsを使った開発が得意で、ユーザビリティを重視したWebアプリケーション開発に情熱を注いでいます。',
-      twitter: '@yamada_taro',
-      instagram: '@yamada_taro',
-      linkedin: 'https://linkedin.com/in/yamada-taro',
-      github: 'yamada-taro',
-      skills: ['React', 'Next.js', 'TypeScript', 'Tailwind CSS', 'Node.js'],
-      education: [
-        {
-          school: '東京大学',
-          degree: '工学部情報工学科',
-          year: '2020年3月'
-        }
-      ],
-      career: [
-        {
-          company: '株式会社テクノロジー',
-          position: 'フロントエンドエンジニア',
-          period: '2020年4月 〜 現在'
-        }
-      ],
-      portfolio: [
-        {
-          title: 'ECサイト開発',
-          description: 'React/Next.jsを使用したECサイト。決済機能まで実装。',
-          url: 'https://example-ec.com',
-          image: ''
-        }
-      ]
-    };
+    // ローカルストレージからフォームデータを取得
+    const savedData = getFormDataLocally();
+    if (savedData) {
+      const profileData: ProfileData = {
+        name: savedData.name || '名前未設定',
+        photo: savedData.photo || '',
+        bio: savedData.bio || '',
+        twitter: savedData.twitter || '',
+        instagram: savedData.instagram || '',
+        linkedin: savedData.linkedin || '',
+        github: savedData.github || '',
+        skills: savedData.skills || [],
+        education: savedData.education || [],
+        career: savedData.career || [],
+        portfolio: savedData.portfolio || []
+      };
+      setProfileData(profileData);
+    } else {
+      // フォームデータがない場合はデフォルトデータ
+      const defaultData: ProfileData = {
+        name: 'サンプル太郎',
+        photo: '',
+        bio: 'まだ自己紹介が入力されていません。',
+        twitter: '',
+        instagram: '',
+        linkedin: '',
+        github: '',
+        skills: [],
+        education: [],
+        career: [],
+        portfolio: []
+      };
+      setProfileData(defaultData);
+    }
     
-    setProfileData(mockData);
     // 仮の共有URLを生成
     setShareUrl(`https://identry.com/p/${generateTempId()}`);
   }, []);
@@ -96,9 +97,9 @@ export default function PreviewPage() {
   };
 
   const handlePublish = () => {
-    // 実際のアプリでは、ここでAPIに保存
-    alert('プロフィールを公開しました！ダッシュボードから管理できます。');
-    router.push('/dashboard');
+    // プロフィールを公開する場合は、ログインページに遷移してデータベースに保存
+    alert('プロフィールを公開するにはログインが必要です。入力されたデータは保持されます。');
+    router.push('/login');
   };
 
   if (!profileData) {

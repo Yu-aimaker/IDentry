@@ -10,13 +10,13 @@ export default function Home() {
       {/* 🎯 ファーストビュー（ヒーローセクション） */}
       <section className="min-h-screen flex flex-col px-6 relative">
         
-        {/* バナー画像 - 上部・余白なし */}
-        <div>
+        {/* バナー画像 - 上部・下部に余白 */}
+        <div className="py-5">
           <Image
             src="/img/banner.png"
             alt="IDentry Banner"
-            width={450}
-            height={150}
+            width={400}
+            height={100}
             className="object-contain max-w-full h-auto mx-auto"
             priority
           />
@@ -27,7 +27,7 @@ export default function Home() {
           <DotLottieReact
             src="/lottie/Animation LottieFiles.lottie"
             autoplay
-            speed={0.45}
+            speed={0.6}
             style={{ width: '250px', height: '250px' }}
           />
         </div>
@@ -50,11 +50,11 @@ export default function Home() {
             >
               今すぐはじめる
             </Link>
-            <Link 
-              href="/preview"
+            <Link
+              href="/login"
               className="text-blue-600 px-10 py-5 rounded-xl text-xl font-medium hover:bg-blue-50 hover:scale-105 transition-all duration-300 text-center border-2 border-blue-200 hover:border-blue-300"
             >
-              サンプルを見る
+              ログイン
             </Link>
           </div>
           </div>

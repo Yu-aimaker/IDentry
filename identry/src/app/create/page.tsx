@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import Link from 'next/link';
+import { saveFormDataLocally, getFormDataLocally } from '../../../lib/supabase';
 
 interface FormData {
   name: string;
@@ -52,6 +54,8 @@ const steps = [
 
 export default function CreatePage() {
   const [currentStep, setCurrentStep] = useState(1);
+  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+  const [justCompletedStep, setJustCompletedStep] = useState<number | null>(null);
   const [formData, setFormData] = useState<FormData>({
     name: '',
     birthYear: '',
@@ -73,6 +77,19 @@ export default function CreatePage() {
   });
   const router = useRouter();
 
+  // 初期化時にローカルストレージからデータを復元
+  useEffect(() => {
+    const savedData = getFormDataLocally();
+    if (savedData) {
+      setFormData(savedData);
+    }
+  }, []);
+
+  // フォームデータが変更されるたびにローカルストレージに保存
+  useEffect(() => {
+    saveFormDataLocally(formData as unknown as Record<string, unknown>);
+  }, [formData]);
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleNext();
@@ -88,6 +105,17 @@ export default function CreatePage() {
     if (currentStep === 10 && !formData.bio) {
       alert('自己紹介を入力してください');
       return;
+    }
+
+    // 現在のステップを完了済みとして追加（重複を避ける）
+    if (!completedSteps.includes(currentStep)) {
+      setCompletedSteps(prev => [...prev, currentStep]);
+      setJustCompletedStep(currentStep);
+      
+      // アニメーション完了後にjustCompletedStepをリセット
+      setTimeout(() => {
+        setJustCompletedStep(null);
+      }, 1000);
     }
 
     if (currentStep < 10) {
@@ -157,13 +185,15 @@ export default function CreatePage() {
       {/* ヘッダー */}
       <header className="border-b border-gray-100">
         <div className="max-w-4xl mx-auto px-4 py-6 flex justify-center">
-          <Image
-            src="/img/banner.png"
-            alt="IDentry Banner"
-            width={200}
-            height={80}
-            className="h-15 object-contain"
-          />
+          <Link href="/" className="cursor-pointer hover:opacity-80 transition-opacity duration-200">
+            <Image
+              src="/img/banner.png"
+              alt="IDentry Banner"
+              width={200}
+              height={80}
+              className="h-15 object-contain"
+            />
+          </Link>
         </div>
       </header>
 
@@ -175,29 +205,51 @@ export default function CreatePage() {
             <div
               key={step.id}
               onClick={() => handleStepClick(step.id)}
-              className={`flex flex-col items-center justify-center space-y-2 p-4 rounded-xl transition-all duration-300 min-h-[80px] cursor-pointer hover:scale-105 ${
+              className={`flex flex-col items-center justify-center space-y-2 p-4 rounded-xl transition-all duration-500 min-h-[80px] cursor-pointer hover:scale-105 ${
                 step.id < currentStep
-                  ? 'bg-green-50 border-2 border-green-200 shadow-sm hover:bg-green-100 hover:border-green-300'
+                  ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 shadow-lg hover:from-green-100 hover:to-emerald-100 hover:border-green-300 hover:shadow-xl step-completed'
                   : step.id === currentStep
-                    ? 'bg-blue-50 border-2 border-blue-300 shadow-md scale-105'
+                    ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-300 shadow-md scale-105 animate-pulse'
                     : 'bg-gray-50 border border-gray-200 opacity-60 hover:opacity-80 hover:bg-gray-100'
               }`}
             >
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-medium transition-all duration-300 ${
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-medium transition-all duration-500 ${
                 step.id < currentStep
-                  ? 'bg-green-500 text-white shadow-lg'
+                  ? `bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-lg ${
+                      justCompletedStep === step.id ? 'animate-step-complete' : ''
+                    }`
                   : step.id === currentStep
-                    ? 'bg-blue-500 text-white shadow-lg animate-pulse'
+                    ? 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg animate-pulse'
                     : 'bg-gray-300 text-gray-500'
               }`}>
-                {step.id < currentStep ? '✓' : step.emoji}
+                {step.id < currentStep ? (
+                  <span
+                    className={`text-xl font-bold ${
+                      justCompletedStep === step.id
+                        ? 'animate-checkmark-pop'
+                        : ''
+                    }`}
+                    key={`check-${step.id}-${justCompletedStep === step.id ? Date.now() : 'static'}`}
+                  >
+                    ✓
+                  </span>
+                ) : step.emoji}
               </div>
               <div className="text-center">
-                <div className={`text-xs font-bold ${
-                  step.id <= currentStep ? 'text-gray-800' : 'text-gray-500'
+                <div className={`text-xs font-bold transition-colors duration-300 ${
+                  step.id < currentStep
+                    ? 'text-green-800'
+                    : step.id === currentStep
+                      ? 'text-blue-800'
+                      : 'text-gray-500'
                 }`}>
                   {step.title}
                 </div>
+                {step.id < currentStep && (
+                  <div className="text-xs text-green-600 font-medium mt-1 opacity-80">
+                    完了 ✨
+                  </div>
+                )}
               </div>
             </div>
           ))}
