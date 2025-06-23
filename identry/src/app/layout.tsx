@@ -17,9 +17,9 @@ export const metadata: Metadata = {
   title: "IDentry - わたしのすべてが、このIDに。",
   description: "SNSリンク、スキル、経歴、ポートフォリオ。あなたの\"ぜんぶ\"を、ひとつのページにまとめよう。",
   icons: {
-    icon: "/img/logo.jpg",
-    shortcut: "/img/logo.jpg",
-    apple: "/img/logo.jpg",
+    icon: "/img/favicon.png",
+    shortcut: "/img/favicon.png",
+    apple: "/img/favicon.png",
   },
 };
 
