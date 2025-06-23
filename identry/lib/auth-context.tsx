@@ -22,9 +22,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // 初期認証状態を取得
     const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      setUser(session?.user ?? null)
-      setLoading(false)
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        console.log('初期セッション取得:', { session: !!session, user: !!session?.user, error })
+        setUser(session?.user ?? null)
+        setLoading(false)
+      } catch (error) {
+        console.error('初期セッション取得エラー:', error)
+        setLoading(false)
+      }
     }
 
     getInitialSession()
@@ -32,6 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // 認証状態の変更を監視
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('認証状態変更:', { event, session: !!session, user: !!session?.user })
         setUser(session?.user ?? null)
         setLoading(false)
       }
@@ -60,7 +67,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/dashboard`
+        redirectTo: `${window.location.origin}/dashboard`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent'
+        }
       }
     })
     if (error) throw error

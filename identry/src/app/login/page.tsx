@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth-context';
-import { getFormDataLocally, clearFormDataLocally, createProfile, addEducation, addCareer, addPortfolio } from '../../../lib/supabase';
+import { getFormDataLocally, clearFormDataLocally, createProfile, addEducation, addCareer, addPortfolio, getUserProfile, updateProfile } from '../../../lib/supabase';
 
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -21,49 +22,82 @@ export default function LoginPage() {
     if (!formData) return;
 
     try {
-      // プロフィール作成
-      const profile = await createProfile({
-        name: formData.name || '',
-        birth_year: formData.birthYear || '',
-        birth_month: formData.birthMonth || '',
-        birth_day: formData.birthDay || '',
-        birth_date: formData.birthDate || '',
-        gender: formData.gender || '',
-        address: formData.address || '',
-        photo: formData.photo || '',
-        bio: formData.bio || '',
-        twitter: formData.twitter || '',
-        instagram: formData.instagram || '',
-        linkedin: formData.linkedin || '',
-        github: formData.github || '',
-        skills: formData.skills || []
-      });
+      // 既存プロフィールをチェック
+      const existingProfile = await getUserProfile();
+      
+      if (existingProfile) {
+        // 既存プロフィールを更新
+        const updatedProfile = await updateProfile({
+          name: formData.name || existingProfile.name,
+          birth_year: formData.birthYear || existingProfile.birth_year,
+          birth_month: formData.birthMonth || existingProfile.birth_month,
+          birth_day: formData.birthDay || existingProfile.birth_day,
+          birth_date: formData.birthDate || existingProfile.birth_date,
+          gender: formData.gender || existingProfile.gender,
+          address: formData.address || existingProfile.address,
+          photo: formData.photo || existingProfile.photo,
+          bio: formData.bio || existingProfile.bio,
+          twitter: formData.twitter || existingProfile.twitter,
+          instagram: formData.instagram || existingProfile.instagram,
+          linkedin: formData.linkedin || existingProfile.linkedin,
+          github: formData.github || existingProfile.github,
+          skills: formData.skills && formData.skills.length > 0 ? formData.skills : existingProfile.skills
+        });
 
-      // 学歴を追加
-      if (formData.education && Array.isArray(formData.education)) {
-        for (const edu of formData.education) {
-          await addEducation(profile.id, edu);
-        }
-      }
+        console.log('プロフィールを更新しました:', updatedProfile);
+      } else {
+        // 新規プロフィール作成
+        const profile = await createProfile({
+          name: formData.name || '',
+          birth_year: formData.birthYear || '',
+          birth_month: formData.birthMonth || '',
+          birth_day: formData.birthDay || '',
+          birth_date: formData.birthDate || '',
+          gender: formData.gender || '',
+          address: formData.address || '',
+          photo: formData.photo || '',
+          bio: formData.bio || '',
+          twitter: formData.twitter || '',
+          instagram: formData.instagram || '',
+          linkedin: formData.linkedin || '',
+          github: formData.github || '',
+          skills: formData.skills || []
+        });
 
-      // 職歴を追加
-      if (formData.career && Array.isArray(formData.career)) {
-        for (const car of formData.career) {
-          await addCareer(profile.id, car);
+        // 学歴を追加
+        if (formData.education && Array.isArray(formData.education)) {
+          for (const edu of formData.education) {
+            await addEducation(profile.id, edu);
+          }
         }
-      }
 
-      // ポートフォリオを追加
-      if (formData.portfolio && Array.isArray(formData.portfolio)) {
-        for (const port of formData.portfolio) {
-          await addPortfolio(profile.id, port);
+        // 職歴を追加
+        if (formData.career && Array.isArray(formData.career)) {
+          for (const car of formData.career) {
+            await addCareer(profile.id, car);
+          }
         }
+
+        // ポートフォリオを追加
+        if (formData.portfolio && Array.isArray(formData.portfolio)) {
+          for (const port of formData.portfolio) {
+            await addPortfolio(profile.id, port);
+          }
+        }
+
+        console.log('新規プロフィールを作成しました:', profile);
       }
 
       // ローカルストレージをクリア
       clearFormDataLocally();
     } catch (error) {
       console.error('フォームデータ保存エラー:', error);
+      // エラーが発生してもプロフィールが既に存在する場合があるので、
+      // 1プロフィール制約エラーの場合は無視
+      if (error instanceof Error && error.message.includes('duplicate')) {
+        console.log('プロフィールは既に存在します');
+        clearFormDataLocally();
+      }
     }
   };
 
@@ -124,11 +158,14 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         {/* ロゴ */}
-        <Link href="/" className="flex items-center justify-center space-x-2 mb-8">
-          <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center">
-            <span className="text-white font-bold text-xl">ID</span>
-          </div>
-          <span className="text-2xl font-bold text-black">IDentry</span>
+        <Link href="/" className="flex items-center justify-center mb-8">
+          <Image
+            src="/img/banner.png"
+            alt="IDentry Banner"
+            width={200}
+            height={80}
+            className="h-15 object-contain cursor-pointer hover:opacity-80 transition-opacity duration-200"
+          />
         </Link>
         
         <h2 className="text-center text-3xl font-bold text-black">

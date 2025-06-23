@@ -75,9 +75,9 @@ export default function PreviewPage() {
   }, []);
 
   const handlePublish = () => {
-    // プロフィールを公開する場合は、ログインページに遷移してデータベースに保存
-    alert('プロフィールを公開するにはログインが必要です。入力されたデータは保持されます。');
-    router.push('/login');
+    // プロフィールを公開する場合は、新規登録ページに遷移してデータベースに保存
+    alert('プロフィールを公開するには新規登録が必要です。入力されたデータは保持されます。');
+    router.push('/signup');
   };
 
   if (!profileData) {

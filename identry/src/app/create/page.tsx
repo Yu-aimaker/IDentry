@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { saveFormDataLocally, getFormDataLocally } from '../../../lib/supabase';
+import { saveFormDataLocally, getFormDataLocally, uploadTempProfileImage } from '../../../lib/supabase';
 
 interface FormData {
   name: string;
@@ -56,6 +56,7 @@ export default function CreatePage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [justCompletedStep, setJustCompletedStep] = useState<number | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     name: '',
     birthYear: '',
@@ -180,6 +181,47 @@ export default function CreatePage() {
     }));
   };
 
+  // 画像アップロード処理
+  const handleImageUpload = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      alert('画像ファイルを選択してください');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) { // 5MB制限
+      alert('ファイルサイズは5MB以下にしてください');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const imageUrl = await uploadTempProfileImage(file);
+      updateFormData('photo', imageUrl);
+      console.log('画像アップロード成功:', imageUrl);
+    } catch (error) {
+      console.error('画像アップロード失敗:', error);
+      alert('画像のアップロードに失敗しました。もう一度お試しください。');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // ドラッグアンドドロップ処理
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      handleImageUpload(files[0]);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white" onKeyDown={handleKeyPress}>
       {/* ヘッダー */}
@@ -266,7 +308,7 @@ export default function CreatePage() {
               {steps[currentStep - 1].title}
             </h1>
             <p className="text-gray-600">
-              {currentStep === 1 && "お名前を入力してください"}
+              {currentStep === 1 && "プロフィール画像とお名前を設定してください"}
               {currentStep === 2 && "生年月日を入力してください"}
               {currentStep === 3 && "性別を選択してください"}
               {currentStep === 4 && "現在の住所を入力してください（任意）"}
@@ -281,19 +323,89 @@ export default function CreatePage() {
 
           {/* ステップ1: 名前 */}
           {currentStep === 1 && (
-            <div>
-              <label className="block text-sm font-medium text-black mb-2">
-                お名前 *
-              </label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => updateFormData('name', e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleNext()}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                placeholder="山田太郎"
-                autoFocus
-              />
+            <div className="space-y-6">
+              {/* アイコン画像アップロード */}
+              <div>
+                <label className="block text-sm font-medium text-black mb-4">
+                  プロフィール画像をアップロード
+                </label>
+                
+                {/* 画像プレビューまたはアップロードエリア */}
+                <div className="flex flex-col items-center space-y-4">
+                  {formData.photo ? (
+                    /* 画像プレビュー */
+                    <div className="relative">
+                      <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-blue-200 shadow-lg">
+                        <Image
+                          src={formData.photo}
+                          alt="プロフィール画像"
+                          width={128}
+                          height={128}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <button
+                        onClick={() => updateFormData('photo', '')}
+                        className="absolute -top-2 -right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    /* アップロードエリア */
+                    <div
+                      onDragOver={handleDragOver}
+                      onDrop={handleDrop}
+                      className="w-40 h-40 border-2 border-dashed border-blue-300 rounded-full flex flex-col items-center justify-center bg-blue-50 hover:bg-blue-100 transition-colors cursor-pointer relative"
+                    >
+                      {isUploading ? (
+                        <div className="text-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                          <p className="text-blue-600 text-xs font-medium">アップロード中</p>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="text-2xl text-blue-400 mb-2">📸</div>
+                          <p className="text-blue-600 text-xs font-medium mb-1">ドロップまたは</p>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleImageUpload(file);
+                            }}
+                            className="hidden"
+                            id="photo-upload"
+                          />
+                          <label
+                            htmlFor="photo-upload"
+                            className="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700 transition-colors cursor-pointer"
+                          >
+                            選択
+                          </label>
+                          <p className="text-xs text-gray-400 mt-1">JPG, PNG (5MB以下)</p>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 名前入力 */}
+              <div>
+                <label className="block text-sm font-medium text-black mb-2">
+                  お名前 *
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => updateFormData('name', e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleNext()}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                  placeholder="山田太郎"
+                  autoFocus
+                />
+              </div>
             </div>
           )}
 

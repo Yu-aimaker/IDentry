@@ -3,7 +3,14 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce'
+  }
+})
 
 // データベースの型定義
 export interface Profile {
@@ -28,6 +35,13 @@ export interface Profile {
   profile_url: string
   created_at: string
   updated_at: string
+  show_education: boolean
+  show_career: boolean
+  show_portfolio: boolean
+  show_skills: boolean
+  show_sns: boolean
+  banner_image?: string
+  nickname?: string
 }
 
 export interface Education {
@@ -123,18 +137,23 @@ export const getProfile = async (profileId?: string) => {
   return data
 }
 
-// ユーザーのプロフィール一覧取得
-export const getUserProfiles = async () => {
+// ユーザーのプロフィール取得（1つのみ）
+export const getUserProfile = async () => {
   const user = await getCurrentUser()
   if (!user) throw new Error('認証が必要です')
 
   const { data, error } = await supabase
     .from('profiles')
-    .select('*')
+    .select(`
+      *,
+      education(*),
+      career(*),
+      portfolio(*)
+    `)
     .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
+    .single()
 
-  if (error) throw error
+  if (error && error.code !== 'PGRST116') throw error // PGRST116は「データが見つからない」エラー
   return data
 }
 
@@ -237,4 +256,104 @@ export const clearFormDataLocally = () => {
   if (typeof window !== 'undefined') {
     localStorage.removeItem('identry_form_data')
   }
+}
+
+// プロフィール更新
+export const updateProfile = async (profileData: Partial<Profile>) => {
+  const user = await getCurrentUser()
+  if (!user) throw new Error('認証が必要です')
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .update(profileData)
+    .eq('user_id', user.id)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+// ブロック公開設定更新
+export const updateBlockVisibility = async (blockSettings: {
+  show_education?: boolean
+  show_career?: boolean
+  show_portfolio?: boolean
+  show_skills?: boolean
+  show_sns?: boolean
+}) => {
+  const user = await getCurrentUser()
+  if (!user) throw new Error('認証が必要です')
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .update(blockSettings)
+    .eq('user_id', user.id)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+// 画像アップロード機能
+export const uploadProfileImage = async (file: File): Promise<string> => {
+  const user = await getCurrentUser()
+  if (!user) throw new Error('認証が必要です')
+
+  // ファイル名を生成（ユーザーID/タイムスタンプ_ファイル名）
+  const fileExt = file.name.split('.').pop()
+  const fileName = `${user.id}/${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`
+
+  const { data, error } = await supabase.storage
+    .from('profile-images')
+    .upload(fileName, file)
+
+  if (error) throw error
+
+  // 公開URLを取得
+  const { data: urlData } = supabase.storage
+    .from('profile-images')
+    .getPublicUrl(data.path)
+
+  return urlData.publicUrl
+}
+
+// 未認証ユーザー用の一時的な画像アップロード（セッションベース）
+export const uploadTempProfileImage = async (file: File): Promise<string> => {
+  // ファイル名を生成（temp/セッションID_タイムスタンプ_ファイル名）
+  const fileExt = file.name.split('.').pop()
+  const sessionId = Math.random().toString(36).substring(2)
+  const fileName = `temp/${sessionId}_${Date.now()}.${fileExt}`
+
+  const { data, error } = await supabase.storage
+    .from('profile-images')
+    .upload(fileName, file)
+
+  if (error) throw error
+
+  // 公開URLを取得
+  const { data: urlData } = supabase.storage
+    .from('profile-images')
+    .getPublicUrl(data.path)
+
+  return urlData.publicUrl
+}
+
+// 画像削除機能
+export const deleteProfileImage = async (imageUrl: string): Promise<void> => {
+  const user = await getCurrentUser()
+  if (!user) throw new Error('認証が必要です')
+
+  // URLからファイルパスを抽出
+  const url = new URL(imageUrl)
+  const pathParts = url.pathname.split('/')
+  const fileName = pathParts[pathParts.length - 1]
+  const filePath = `${user.id}/${fileName}`
+
+  const { error } = await supabase.storage
+    .from('profile-images')
+    .remove([filePath])
+
+  if (error) throw error
 } 
