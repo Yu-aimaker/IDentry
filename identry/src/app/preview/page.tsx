@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { getFormDataLocally, clearFormDataLocally } from '../../../lib/supabase';
+import { getFormDataLocally } from '../../../lib/supabase';
 
 interface ProfileData {
   name: string;
