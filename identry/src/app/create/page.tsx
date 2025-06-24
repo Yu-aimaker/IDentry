@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -54,7 +54,7 @@ const steps = [
   { id: 10, title: '自己紹介', emoji: '💬' }
 ];
 
-export default function CreatePage() {
+function CreatePage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [justCompletedStep, setJustCompletedStep] = useState<number | null>(null);
@@ -1194,5 +1194,13 @@ function PortfolioInput({ portfolio, addPortfolio }: {
         </div>
       )}
     </div>
+  );
+}
+
+export default function CreatePageWithSuspense() {
+  return (
+    <Suspense>
+      <CreatePage />
+    </Suspense>
   );
 }
