@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
@@ -41,7 +41,7 @@ interface ProfileData {
   address?: string;
 }
 
-export default function PreviewPage() {
+function PreviewPageContent() {
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -320,5 +320,13 @@ export default function PreviewPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PreviewPage() {
+  return (
+    <Suspense fallback={<div>読み込み中...</div>}>
+      <PreviewPageContent />
+    </Suspense>
   );
 }
