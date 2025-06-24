@@ -43,6 +43,9 @@ export interface Profile {
   banner_image?: string
   nickname?: string
   google_avatar_url?: string
+  education?: Education[]
+  career?: Career[]
+  portfolio?: Portfolio[]
 }
 
 export interface Education {

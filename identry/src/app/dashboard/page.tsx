@@ -245,11 +245,11 @@ export default function MyPage() {
                       </div>
                     )}
                     {/* 経歴 */}
-                    {((profile as any).career ?? []).length > 0 && (
+                    {profile.career && profile.career.length > 0 && (
                       <div className="bg-white/80 rounded-xl shadow p-6 flex flex-col">
                         <h3 className="text-lg font-bold mb-3 flex items-center gap-2">🏢 経歴</h3>
                         <ul className="space-y-2">
-                          {((profile as any).career as {company:string,position?:string,period?:string}[]).map((item, i) => (
+                          {profile.career.map((item, i) => (
                             <li key={i} className="border-l-4 border-blue-400 pl-4">
                               <div className="font-semibold">{item.company}</div>
                               <div className="text-sm text-gray-600">{item.position}</div>
@@ -260,11 +260,11 @@ export default function MyPage() {
                       </div>
                     )}
                     {/* 学歴 */}
-                    {((profile as any).education ?? []).length > 0 && (
+                    {profile.education && profile.education.length > 0 && (
                       <div className="bg-white/80 rounded-xl shadow p-6 flex flex-col">
                         <h3 className="text-lg font-bold mb-3 flex items-center gap-2">🎓 学歴</h3>
                         <ul className="space-y-2">
-                          {((profile as any).education as {school:string,degree?:string,year?:string}[]).map((item, i) => (
+                          {profile.education.map((item, i) => (
                             <li key={i} className="border-l-4 border-green-400 pl-4">
                               <div className="font-semibold">{item.school}</div>
                               <div className="text-sm text-gray-600">{item.degree}</div>
@@ -275,11 +275,11 @@ export default function MyPage() {
                       </div>
                     )}
                     {/* ポートフォリオ */}
-                    {((profile as any).portfolio ?? []).length > 0 && (
+                    {profile.portfolio && profile.portfolio.length > 0 && (
                       <div className="bg-white/80 rounded-xl shadow p-6 flex flex-col md:col-span-2">
                         <h3 className="text-lg font-bold mb-3 flex items-center gap-2">🌟 ポートフォリオ</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          {((profile as any).portfolio as {title:string,description?:string,url?:string,image?:string}[]).map((item, i) => (
+                          {profile.portfolio.map((item, i) => (
                             <div key={i} className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow bg-white">
                               {item.image && (
                                 <Image
