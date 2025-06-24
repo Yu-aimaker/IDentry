@@ -1,20 +1,30 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useAuth } from '../../../lib/auth-context';
-import { getUserProfile, updateProfile, updateBlockVisibility, uploadProfileImage, Profile } from '../../../lib/supabase';
+import { getUserProfile, updateBlockVisibility, Profile, getProfileImageUrl, uploadProfileImage, updateFullProfile } from '../../../lib/supabase';
+import { IDCardProfile } from "../../../components/ui/IDCardProfile";
+import { Github, Twitter, Instagram, Linkedin } from "lucide-react";
+import { QRCodeCanvas } from 'qrcode.react';
 
 export default function MyPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [isEditingNickname, setIsEditingNickname] = useState(false);
-  const [nickname, setNickname] = useState('');
   const [showQRModal, setShowQRModal] = useState(false);
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const { user, loading, signOut } = useAuth();
   const router = useRouter();
+  const getInitialVariant = (): 'pasmo' | 'credit' | 'corporate' | 'metro' => {
+    if (typeof window !== 'undefined') {
+      const v = localStorage.getItem('card_variant');
+      if (v === 'pasmo' || v === 'credit' || v === 'corporate' || v === 'metro') return v;
+    }
+    return 'pasmo';
+  };
+  const [cardVariant, setCardVariant] = useState<'pasmo' | 'credit' | 'corporate' | 'metro'>(getInitialVariant);
+  const [showPreset, setShowPreset] = useState(false);
+  const cardAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -28,7 +38,6 @@ export default function MyPage() {
       try {
         const userProfile = await getUserProfile();
         setProfile(userProfile);
-        setNickname(userProfile?.nickname || userProfile?.name || '');
       } catch (error) {
         console.error('プロフィール取得エラー:', error);
       }
@@ -37,17 +46,12 @@ export default function MyPage() {
     loadProfile();
   }, [user, loading, router]);
 
-  const handleUpdateNickname = async () => {
-    if (!profile) return;
-    
-    try {
-      const updatedProfile = await updateProfile({ nickname });
-      setProfile(updatedProfile);
-      setIsEditingNickname(false);
-    } catch (error) {
-      console.error('ニックネーム更新エラー:', error);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const v = localStorage.getItem('card_variant');
+      if (v === 'pasmo' || v === 'credit' || v === 'corporate' || v === 'metro') setCardVariant(v);
     }
-  };
+  }, []);
 
   const handleToggleBlockVisibility = async (blockType: string, currentValue: boolean) => {
     if (!profile) return;
@@ -81,30 +85,10 @@ export default function MyPage() {
     }
   };
 
-  // プロフィール画像アップロード処理
-  const handleImageUpload = async (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      alert('画像ファイルを選択してください');
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) { // 5MB制限
-      alert('ファイルサイズは5MB以下にしてください');
-      return;
-    }
-
-    setIsUploadingImage(true);
-    try {
-      const imageUrl = await uploadProfileImage(file);
-      const updatedProfile = await updateProfile({ photo: imageUrl });
-      setProfile(updatedProfile);
-      console.log('プロフィール画像更新成功:', imageUrl);
-    } catch (error) {
-      console.error('プロフィール画像更新失敗:', error);
-      alert('画像のアップロードに失敗しました。もう一度お試しください。');
-    } finally {
-      setIsUploadingImage(false);
-    }
+  const handleVariantChange = (v: string) => {
+    setCardVariant(v as 'pasmo' | 'credit' | 'corporate' | 'metro');
+    if (typeof window !== 'undefined') localStorage.setItem('card_variant', v);
+    setShowPreset(false);
   };
 
   return (
@@ -126,15 +110,18 @@ export default function MyPage() {
           <header className="bg-white border-b border-gray-100">
             <div className="max-w-4xl mx-auto px-4 py-4">
               <div className="flex items-center justify-between">
-                <Link href="/" className="flex items-center space-x-2">
-                  <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                    <span className="text-white font-bold text-lg">ID</span>
-                  </div>
-                  <span className="text-xl font-bold text-black">IDentry</span>
+                <Link href="/" className="flex items-center">
+                  <Image
+                    src="/img/banner.png"
+                    alt="IDentry Banner"
+                    width={160}
+                    height={64}
+                    className="h-10 object-contain cursor-pointer hover:opacity-80 transition-opacity duration-200"
+                  />
                 </Link>
                 
                 <div className="flex items-center space-x-4">
-                  <span className="text-gray-600">こんにちは、{user?.email}さん</span>
+                  <span className="text-gray-600">こんにちは、{profile?.nickname || profile?.name || 'ユーザー'}さん</span>
                   <button
                     onClick={handleLogout}
                     className="text-gray-500 hover:text-gray-700 transition-colors"
@@ -169,132 +156,165 @@ export default function MyPage() {
             ) : (
               /* プロフィール管理エリア */
               <div className="space-y-6">
-                {/* バナー・アイコンエリア */}
-                <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-                  {/* バナー画像 */}
-                  <div className="h-32 bg-gradient-to-r from-blue-500 to-purple-600 relative">
-                    <button className="absolute top-4 right-4 bg-white/20 text-white px-3 py-1 rounded-lg text-sm hover:bg-white/30 transition-colors">
-                      バナー変更
+                {/* カード中央寄せ・大きさ調整＋ボタン配置 */}
+                <div className="flex flex-col items-center justify-center">
+                  <div className="w-full max-w-md relative" ref={cardAreaRef}>
+                    {/* デザイン変更ボタン */}
+                    <button
+                      className="absolute top-2 right-2 z-10 bg-white/80 border border-gray-200 rounded-full px-3 py-1 text-xs font-medium shadow hover:bg-white"
+                      onClick={() => setShowPreset((v) => !v)}
+                    >
+                      デザイン変更
                     </button>
+                    {/* プリセット選択UI（ポップオーバー） */}
+                    {showPreset && (
+                      <div className="absolute top-10 right-0 z-20 bg-white border border-gray-200 rounded-xl shadow-lg p-4 w-64">
+                        <IDCardProfile
+                          showPresetSelector
+                          variant={cardVariant}
+                          onVariantChange={handleVariantChange}
+                        />
+                        <button
+                          className="mt-4 w-full text-sm text-gray-500 hover:text-black"
+                          onClick={() => setShowPreset(false)}
+                        >閉じる</button>
+                      </div>
+                    )}
+                    <IDCardProfile
+                      profileData={{
+                        name: profile.nickname || profile.name,
+                        title: profile.bio || "",
+                        department: "",
+                        employeeId: profile.id || "",
+                        joinDate: profile.created_at ? new Date(profile.created_at).toLocaleDateString() : "",
+                        email: user?.email || "",
+                        avatar: getProfileImageUrl(profile) || undefined,
+                      }}
+                      variant={cardVariant}
+                      enableAvatarUpload
+                      onAvatarUpload={async (file) => {
+                        // 画像アップロード→プロフィール更新→再取得
+                        const url = await uploadProfileImage(file);
+                        await updateFullProfile({ ...profile, photo: url });
+                        const updated = await getUserProfile();
+                        setProfile(updated);
+                      }}
+                    />
                   </div>
-                  
-                  {/* プロフィール情報 */}
-                  <div className="p-6 -mt-16 relative">
-                    <div className="flex items-end space-x-4 mb-4">
-                      {/* アイコン */}
-                      <div className="relative">
-                        <div className="w-24 h-24 bg-gray-200 rounded-full border-4 border-white shadow-lg flex items-center justify-center overflow-hidden">
-                          {profile.photo ? (
-                            <Image
-                              src={profile.photo}
-                              alt="プロフィール画像"
-                              width={96}
-                              height={96}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <span className="text-2xl text-gray-500">👤</span>
+                  {/* 新・詳細セクション */}
+                  <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-2xl">
+                    {/* スキル */}
+                    {profile.skills && profile.skills.length > 0 && (
+                      <div className="bg-white/80 rounded-xl shadow p-6 flex flex-col">
+                        <h3 className="text-lg font-bold mb-3 flex items-center gap-2">💡 スキル</h3>
+                        <div className="flex flex-wrap gap-2">
+                          {profile.skills.map((skill: string, i: number) => (
+                            <span key={i} className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {/* SNSリンク */}
+                    {(profile.twitter || profile.instagram || profile.linkedin || profile.github) && (
+                      <div className="bg-white/80 rounded-xl shadow p-6 flex flex-col">
+                        <h3 className="text-lg font-bold mb-3 flex items-center gap-2">🔗 SNS</h3>
+                        <div className="flex gap-4 items-center">
+                          {profile.twitter && (
+                            <a href={`https://twitter.com/${profile.twitter.replace(/^@/,"")}`} target="_blank" rel="noopener noreferrer" className="hover:text-blue-500">
+                              <Twitter className="w-6 h-6" />
+                            </a>
+                          )}
+                          {profile.instagram && (
+                            <a href={`https://instagram.com/${profile.instagram.replace(/^@/,"")}`} target="_blank" rel="noopener noreferrer" className="hover:text-pink-500">
+                              <Instagram className="w-6 h-6" />
+                            </a>
+                          )}
+                          {profile.linkedin && (
+                            <a href={`https://linkedin.com/in/${profile.linkedin.replace(/^@/,"")}`} target="_blank" rel="noopener noreferrer" className="hover:text-blue-700">
+                              <Linkedin className="w-6 h-6" />
+                            </a>
+                          )}
+                          {profile.github && (
+                            <a href={`https://github.com/${profile.github.replace(/^@/,"")}`} target="_blank" rel="noopener noreferrer" className="hover:text-gray-800">
+                              <Github className="w-6 h-6" />
+                            </a>
                           )}
                         </div>
-                        
-                        {/* アップロード中のオーバーレイ */}
-                        {isUploadingImage && (
-                          <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
-                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
-                          </div>
-                        )}
-                        
-                        {/* ファイル選択ボタン */}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleImageUpload(file);
-                          }}
-                          className="hidden"
-                          id="profile-image-upload"
-                          disabled={isUploadingImage}
-                        />
-                        <label
-                          htmlFor="profile-image-upload"
-                          className="absolute -bottom-1 -right-1 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm hover:bg-blue-700 transition-colors cursor-pointer"
-                        >
-                          ✏️
-                        </label>
                       </div>
-                      
-                      {/* 名前・ニックネーム */}
-                      <div className="flex-1 pb-2">
-                        {isEditingNickname ? (
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="text"
-                              value={nickname}
-                              onChange={(e) => setNickname(e.target.value)}
-                              className="text-xl font-bold text-black border-b-2 border-blue-600 bg-transparent focus:outline-none"
-                              autoFocus
-                            />
-                            <button
-                              onClick={handleUpdateNickname}
-                              className="text-blue-600 hover:text-blue-700"
-                            >
-                              ✓
-                            </button>
-                            <button
-                              onClick={() => setIsEditingNickname(false)}
-                              className="text-gray-500 hover:text-gray-700"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center space-x-2">
-                            <h2 className="text-xl font-bold text-black">
-                              {profile.nickname || profile.name}
-                            </h2>
-                            <button
-                              onClick={() => setIsEditingNickname(true)}
-                              className="text-gray-500 hover:text-gray-700"
-                            >
-                              ✏️
-                            </button>
-                          </div>
-                        )}
-                        <p className="text-gray-600 text-sm">{profile.bio}</p>
+                    )}
+                    {/* 経歴 */}
+                    {((profile as any).career ?? []).length > 0 && (
+                      <div className="bg-white/80 rounded-xl shadow p-6 flex flex-col">
+                        <h3 className="text-lg font-bold mb-3 flex items-center gap-2">🏢 経歴</h3>
+                        <ul className="space-y-2">
+                          {((profile as any).career as {company:string,position?:string,period?:string}[]).map((item, i) => (
+                            <li key={i} className="border-l-4 border-blue-400 pl-4">
+                              <div className="font-semibold">{item.company}</div>
+                              <div className="text-sm text-gray-600">{item.position}</div>
+                              <div className="text-xs text-gray-400">{item.period}</div>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
-                    </div>
-
-                    {/* アクションボタン */}
-                    <div className="flex flex-wrap gap-3">
-                      <Link
-                        href="/create"
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
-                      >
-                        ✏️ プロフィール編集
-                      </Link>
-                      
-                      <Link
-                        href="/preview"
-                        className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors text-sm"
-                      >
-                        👀 プレビュー
-                      </Link>
-                      
-                      <button
-                        onClick={() => setShowQRModal(true)}
-                        className="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg hover:bg-purple-200 transition-colors text-sm"
-                      >
-                        📱 QRコード
-                      </button>
-                      
-                      <button
-                        onClick={() => copyToClipboard(profile.profile_url)}
-                        className="bg-green-100 text-green-700 px-4 py-2 rounded-lg hover:bg-green-200 transition-colors text-sm"
-                      >
-                        🔗 URLコピー
-                      </button>
-                    </div>
+                    )}
+                    {/* 学歴 */}
+                    {((profile as any).education ?? []).length > 0 && (
+                      <div className="bg-white/80 rounded-xl shadow p-6 flex flex-col">
+                        <h3 className="text-lg font-bold mb-3 flex items-center gap-2">🎓 学歴</h3>
+                        <ul className="space-y-2">
+                          {((profile as any).education as {school:string,degree?:string,year?:string}[]).map((item, i) => (
+                            <li key={i} className="border-l-4 border-green-400 pl-4">
+                              <div className="font-semibold">{item.school}</div>
+                              <div className="text-sm text-gray-600">{item.degree}</div>
+                              <div className="text-xs text-gray-400">{item.year}</div>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {/* ポートフォリオ */}
+                    {((profile as any).portfolio ?? []).length > 0 && (
+                      <div className="bg-white/80 rounded-xl shadow p-6 flex flex-col md:col-span-2">
+                        <h3 className="text-lg font-bold mb-3 flex items-center gap-2">🌟 ポートフォリオ</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {((profile as any).portfolio as {title:string,description?:string,url?:string,image?:string}[]).map((item, i) => (
+                            <div key={i} className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow bg-white">
+                              {item.image && (
+                                <Image
+                                  src={item.image}
+                                  alt={item.title}
+                                  width={400}
+                                  height={192}
+                                  className="w-full h-48 object-cover"
+                                />
+                              )}
+                              <div className="p-4">
+                                <div className="font-semibold text-lg mb-1">{item.title}</div>
+                                <div className="text-gray-600 text-sm mb-2">{item.description}</div>
+                                {item.url && (
+                                  <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm font-medium">
+                                    プロジェクトを見る →
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {/* ボタン群 */}
+                  <div className="flex gap-4 justify-center mt-6">
+                    <Link href="/preview" className="border-2 border-blue-600 text-blue-600 bg-white px-6 py-2 rounded-lg hover:bg-blue-50 transition-colors font-semibold">プレビュー</Link>
+                    <button
+                      onClick={() => setShowQRModal(true)}
+                      className="border-2 border-orange-500 text-orange-500 bg-white px-6 py-2 rounded-lg hover:bg-orange-50 transition-colors font-semibold"
+                    >
+                      共有
+                    </button>
+                    <Link href="/create?edit=true" className="border-2 border-gray-400 text-gray-600 bg-white px-6 py-2 rounded-lg hover:bg-gray-50 transition-colors font-semibold">編集</Link>
                   </div>
                 </div>
 
@@ -381,33 +401,33 @@ export default function MyPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-black mb-4">QRコード</h2>
+              <h2 className="text-2xl font-bold text-black mb-4">共有・QRコード</h2>
               <p className="text-gray-600 mb-6">{profile.nickname || profile.name}</p>
-              
-              {/* QRコードプレースホルダー */}
               <div className="w-48 h-48 mx-auto bg-gray-100 rounded-lg flex items-center justify-center mb-6">
-                <div className="text-center">
-                  <div className="text-4xl mb-2">📱</div>
-                  <p className="text-sm text-gray-500">QRコード</p>
-                  <p className="text-xs text-gray-400 mt-1">実装予定</p>
-                </div>
+                {profile.profile_url ? (
+                  <QRCodeCanvas value={profile.profile_url} size={180} />
+                ) : (
+                  <div className="text-center">
+                    <div className="text-4xl mb-2">📱</div>
+                    <p className="text-sm text-gray-500">QRコード</p>
+                    <p className="text-xs text-gray-400 mt-1">URL未設定</p>
+                  </div>
+                )}
               </div>
-              
               <p className="text-sm text-gray-600 mb-4">
-                このQRコードをスキャンすると<br />
-                プロフィールページが開きます
+                このQRコードまたはURLをシェアできます
               </p>
-              
               <div className="space-y-3">
                 <button
                   onClick={() => copyToClipboard(profile.profile_url)}
-                  className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
+                  className="w-full border-2 border-blue-600 text-blue-600 bg-white py-2 rounded-lg hover:bg-blue-50 font-semibold"
                 >
                   URLをコピー
                 </button>
+                <div className="w-full break-all text-xs text-gray-500 bg-gray-50 rounded p-2 mb-2">{profile.profile_url}</div>
                 <button
                   onClick={() => setShowQRModal(false)}
-                  className="w-full bg-gray-100 text-gray-700 py-2 rounded-lg hover:bg-gray-200"
+                  className="w-full border-2 border-gray-400 text-gray-600 bg-white py-2 rounded-lg hover:bg-gray-50 font-semibold"
                 >
                   閉じる
                 </button>

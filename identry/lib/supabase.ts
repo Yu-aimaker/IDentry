@@ -42,6 +42,7 @@ export interface Profile {
   show_sns: boolean
   banner_image?: string
   nickname?: string
+  google_avatar_url?: string
 }
 
 export interface Education {
@@ -78,6 +79,36 @@ export const getCurrentUser = async () => {
   return user
 }
 
+// GoogleアカウントのアバターURLを取得する関数
+export const getGoogleAvatarUrl = async () => {
+  const user = await getCurrentUser()
+  if (!user) return null
+  
+  // Googleプロバイダーの場合のみアバターURLを取得
+  if (user.app_metadata?.provider === 'google') {
+    return user.user_metadata?.avatar_url || null
+  }
+  return null
+}
+
+// プロフィール画像のURLを取得（優先順位: photo -> google_avatar_url -> null）
+export const getProfileImageUrl = (profile: Profile | null): string | null => {
+  if (!profile) return null
+  
+  // 1. 設定されたプロフィール画像があれば優先
+  if (profile.photo) {
+    return profile.photo
+  }
+  
+  // 2. Googleアバターがあれば使用
+  if (profile.google_avatar_url) {
+    return profile.google_avatar_url
+  }
+  
+  // 3. どちらもない場合はnull
+  return null
+}
+
 // プロフィール作成
 export const createProfile = async (profileData: {
   name: string
@@ -98,12 +129,16 @@ export const createProfile = async (profileData: {
   const user = await getCurrentUser()
   if (!user) throw new Error('認証が必要です')
 
+  // GoogleアカウントのアバターURLを取得
+  const googleAvatarUrl = await getGoogleAvatarUrl()
+
   const { data, error } = await supabase
     .from('profiles')
     .upsert({
       user_id: user.id,
       ...profileData,
-      skills: profileData.skills || []
+      skills: profileData.skills || [],
+      google_avatar_url: googleAvatarUrl
     })
     .select()
     .single()
@@ -140,7 +175,7 @@ export const getProfile = async (profileId?: string) => {
 // ユーザーのプロフィール取得（1つのみ）
 export const getUserProfile = async () => {
   const user = await getCurrentUser()
-  if (!user) throw new Error('認証が必要です')
+  if (!user) return null;
 
   const { data, error } = await supabase
     .from('profiles')
@@ -263,9 +298,16 @@ export const updateProfile = async (profileData: Partial<Profile>) => {
   const user = await getCurrentUser()
   if (!user) throw new Error('認証が必要です')
 
+  // Googleアバター情報を取得して含める
+  const googleAvatarUrl = await getGoogleAvatarUrl()
+  const updateData = {
+    ...profileData,
+    google_avatar_url: googleAvatarUrl || profileData.google_avatar_url
+  }
+
   const { data, error } = await supabase
     .from('profiles')
-    .update(profileData)
+    .update(updateData)
     .eq('user_id', user.id)
     .select()
     .single()
@@ -356,4 +398,161 @@ export const deleteProfileImage = async (imageUrl: string): Promise<void> => {
     .remove([filePath])
 
   if (error) throw error
+}
+
+// プロフィール編集用の包括的な更新関数
+export const updateFullProfile = async (profileData: {
+  name: string
+  birth_year?: string
+  birth_month?: string
+  birth_day?: string
+  birth_date?: string
+  gender?: string
+  address?: string
+  photo?: string
+  bio?: string
+  twitter?: string
+  instagram?: string
+  linkedin?: string
+  github?: string
+  skills?: string[]
+  google_avatar_url?: string
+  education?: Array<{
+    school: string
+    degree?: string
+    year?: string
+  }>
+  career?: Array<{
+    company: string
+    position?: string
+    period?: string
+  }>
+  portfolio?: Array<{
+    title: string
+    description?: string
+    url?: string
+    image?: string
+  }>
+}) => {
+  const user = await getCurrentUser()
+  if (!user) return null;
+
+  try {
+    // プロフィール情報を更新
+    const { education, career, portfolio, ...mainProfileData } = profileData
+    
+    // Googleアバター情報を取得
+    const googleAvatarUrl = await getGoogleAvatarUrl()
+    
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .upsert({
+        user_id: user.id,
+        ...mainProfileData,
+        skills: mainProfileData.skills || [],
+        google_avatar_url: googleAvatarUrl || mainProfileData.google_avatar_url
+      }, { onConflict: 'user_id' })
+      .select()
+      .single()
+
+    if (profileError) {
+      console.error('プロフィール更新エラー詳細:', profileError)
+      throw new Error(`プロフィールの更新に失敗しました: ${profileError.message || 'データベースエラー'}`)
+    }
+
+    // 既存の学歴、職歴、ポートフォリオを削除
+    const deletePromises = await Promise.allSettled([
+      supabase.from('education').delete().eq('profile_id', profile.id),
+      supabase.from('career').delete().eq('profile_id', profile.id),
+      supabase.from('portfolio').delete().eq('profile_id', profile.id)
+    ])
+
+    // 削除エラーをログに記録（非致命的）
+    deletePromises.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        const tables = ['education', 'career', 'portfolio']
+        console.warn(`${tables[index]}の削除に失敗:`, result.reason)
+      }
+    })
+
+    // 新しい学歴を追加
+    if (education && education.length > 0) {
+      const educationData = education
+        .filter(edu => edu.school) // 空の学校名は除外
+        .map(edu => ({
+          profile_id: profile.id,
+          school: edu.school,
+          degree: edu.degree || '',
+          year: edu.year || ''
+        }))
+      
+      if (educationData.length > 0) {
+        const { error: educationError } = await supabase
+          .from('education')
+          .insert(educationData)
+        
+        if (educationError) {
+          console.error('学歴追加エラー:', educationError)
+          throw new Error(`学歴の追加に失敗しました: ${educationError.message}`)
+        }
+      }
+    }
+
+    // 新しい職歴を追加
+    if (career && career.length > 0) {
+      const careerData = career
+        .filter(car => car.company) // 空の会社名は除外
+        .map(car => ({
+          profile_id: profile.id,
+          company: car.company,
+          position: car.position || '',
+          period: car.period || ''
+        }))
+      
+      if (careerData.length > 0) {
+        const { error: careerError } = await supabase
+          .from('career')
+          .insert(careerData)
+        
+        if (careerError) {
+          console.error('職歴追加エラー:', careerError)
+          throw new Error(`職歴の追加に失敗しました: ${careerError.message}`)
+        }
+      }
+    }
+
+    // 新しいポートフォリオを追加
+    if (portfolio && portfolio.length > 0) {
+      const portfolioData = portfolio
+        .filter(port => port.title) // 空のタイトルは除外
+        .map(port => ({
+          profile_id: profile.id,
+          title: port.title,
+          description: port.description || '',
+          url: port.url || '',
+          image: port.image || ''
+        }))
+      
+      if (portfolioData.length > 0) {
+        const { error: portfolioError } = await supabase
+          .from('portfolio')
+          .insert(portfolioData)
+        
+        if (portfolioError) {
+          console.error('ポートフォリオ追加エラー:', portfolioError)
+          throw new Error(`ポートフォリオの追加に失敗しました: ${portfolioError.message}`)
+        }
+      }
+    }
+
+    return profile
+  } catch (error) {
+    console.error('プロフィール更新エラー:', error)
+    // エラーを詳細にログに出力
+    if (error instanceof Error) {
+      throw error
+    } else {
+      throw new Error(`プロフィール更新中に予期しないエラーが発生しました: ${String(error)}`)
+    }
+  }
 } 

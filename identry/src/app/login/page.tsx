@@ -1,20 +1,96 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../lib/auth-context';
-import { getFormDataLocally, clearFormDataLocally, createProfile, addEducation, addCareer, addPortfolio, getUserProfile, updateProfile } from '../../../lib/supabase';
+import { getFormDataLocally, clearFormDataLocally, createProfile, addEducation, addCareer, addPortfolio, getUserProfile, updateProfile, getGoogleAvatarUrl } from '../../../lib/supabase';
 
 export default function LoginPage() {
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin, setIsLogin] = useState(true); // デフォルトはログインモード
+  const searchParams = useSearchParams();
+
+  // URLパラメータに基づいてモードを設定
+  useEffect(() => {
+    const mode = searchParams.get('mode');
+    if (mode === 'signup') {
+      setIsLogin(false); // 新規登録モード
+    } else if (mode === 'login') {
+      setIsLogin(true); // ログインモード
+    }
+    // パラメータがない場合はデフォルトのログインモードを維持
+  }, [searchParams]);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const router = useRouter();
   const { signIn, signUp, signInWithGoogle } = useAuth();
+
+  // エラーメッセージをクリアする関数
+  const clearMessages = () => {
+    setError(null);
+    setSuccess(null);
+  };
+
+  // Supabaseエラーを分析してユーザーフレンドリーなメッセージに変換
+  const getErrorMessage = (error: Error | unknown): string => {
+    if (!error) return '不明なエラーが発生しました。';
+    
+    let errorMessage = '';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    } else if (typeof error === 'string') {
+      errorMessage = error;
+    } else {
+      errorMessage = String(error);
+    }
+    
+    // 認証関連のエラーメッセージを日本語に変換
+    if (errorMessage.includes('Invalid login credentials')) {
+      return 'メールアドレスまたはパスワードが正しくありません。';
+    }
+    if (errorMessage.includes('Email not confirmed')) {
+      return 'メールアドレスの確認が完了していません。確認メールをご確認ください。';
+    }
+    if (errorMessage.includes('User already registered')) {
+      return 'このメールアドレスは既に登録されています。ログインをお試しください。';
+    }
+    if (errorMessage.includes('Password should be at least')) {
+      return 'パスワードは6文字以上で入力してください。';
+    }
+    if (errorMessage.includes('Invalid email')) {
+      return 'メールアドレスの形式が正しくありません。';
+    }
+    if (errorMessage.includes('Rate limit exceeded')) {
+      return 'リクエストが多すぎます。しばらく時間をおいて再度お試しください。';
+    }
+    if (errorMessage.includes('Network error')) {
+      return 'ネットワークエラーが発生しました。インターネット接続をご確認ください。';
+    }
+    if (errorMessage.includes('Signup not allowed')) {
+      return '現在、新規登録は受け付けておりません。';
+    }
+    if (errorMessage.includes('Email link is invalid')) {
+      return 'メール確認リンクが無効です。再度確認メールを送信してください。';
+    }
+    if (errorMessage.includes('Token has expired')) {
+      return 'セッションの有効期限が切れました。再度ログインしてください。';
+    }
+    if (errorMessage.includes('Weak password')) {
+      return 'パスワードが簡単すぎます。より強力なパスワードを設定してください。';
+    }
+    if (errorMessage.includes('Too many requests')) {
+      return 'アクセスが集中しています。時間をおいて再度お試しください。';
+    }
+    
+    // デフォルトメッセージ
+    return `エラーが発生しました: ${errorMessage}`;
+  };
 
   // フォームデータをデータベースに保存する関数
   const saveFormDataToDatabase = async () => {
@@ -41,7 +117,8 @@ export default function LoginPage() {
           instagram: formData.instagram || existingProfile.instagram,
           linkedin: formData.linkedin || existingProfile.linkedin,
           github: formData.github || existingProfile.github,
-          skills: formData.skills && formData.skills.length > 0 ? formData.skills : existingProfile.skills
+          skills: formData.skills && formData.skills.length > 0 ? formData.skills : existingProfile.skills,
+          google_avatar_url: await getGoogleAvatarUrl() || existingProfile.google_avatar_url
         });
 
         console.log('プロフィールを更新しました:', updatedProfile);
@@ -104,15 +181,17 @@ export default function LoginPage() {
   const handleGoogleLogin = async () => {
     try {
       setIsLoading(true);
+      clearMessages();
       await signInWithGoogle();
       
       // フォームデータが保存されている場合、データベースに保存
       await saveFormDataToDatabase();
       
+      setSuccess('Googleログインに成功しました！');
       router.push('/dashboard');
     } catch (error) {
       console.error('Googleログインエラー:', error);
-      alert('Googleログインに失敗しました。');
+      setError(getErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
@@ -120,14 +199,15 @@ export default function LoginPage() {
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    clearMessages();
     
     if (!email || !password) {
-      alert('メールアドレスとパスワードを入力してください。');
+      setError('メールアドレスとパスワードを入力してください。');
       return;
     }
 
     if (!isLogin && password !== confirmPassword) {
-      alert('パスワードが一致しません。');
+      setError('パスワードが一致しません。');
       return;
     }
 
@@ -136,19 +216,21 @@ export default function LoginPage() {
       
       if (isLogin) {
         await signIn(email, password);
-        alert('ログインが成功しました！');
+        setSuccess('ログインに成功しました！');
       } else {
         await signUp(email, password);
-        alert('アカウント作成が完了しました！確認メールを送信しました。');
+        setSuccess('アカウント作成が完了しました！確認メールを送信いたしました。メールをご確認の上、リンクをクリックしてアカウントを有効化してください。');
       }
 
       // フォームデータが保存されている場合、データベースに保存
       await saveFormDataToDatabase();
       
-      router.push('/dashboard');
+      if (isLogin) {
+        router.push('/dashboard');
+      }
     } catch (error) {
       console.error('認証エラー:', error);
-      alert(isLogin ? 'ログインに失敗しました。' : 'アカウント作成に失敗しました。');
+      setError(getErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
@@ -176,7 +258,10 @@ export default function LoginPage() {
             <>
               アカウントをお持ちでない方は{' '}
               <button
-                onClick={() => setIsLogin(false)}
+                onClick={() => {
+                  setIsLogin(false);
+                  clearMessages();
+                }}
                 className="font-medium text-blue-600 hover:text-blue-500"
               >
                 アカウント作成
@@ -186,7 +271,10 @@ export default function LoginPage() {
             <>
               既にアカウントをお持ちの方は{' '}
               <button
-                onClick={() => setIsLogin(true)}
+                onClick={() => {
+                  setIsLogin(true);
+                  clearMessages();
+                }}
                 className="font-medium text-blue-600 hover:text-blue-500"
               >
                 ログイン
@@ -236,6 +324,29 @@ export default function LoginPage() {
               <span className="px-2 bg-white text-gray-500">または</span>
             </div>
           </div>
+
+          {/* エラー・成功メッセージ */}
+          {error && (
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-center">
+                <svg className="w-5 h-5 text-red-400 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            </div>
+          )}
+
+          {success && (
+            <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center">
+                <svg className="w-5 h-5 text-green-400 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <p className="text-sm text-green-700">{success}</p>
+              </div>
+            </div>
+          )}
 
           {/* メールフォーム */}
           <form onSubmit={handleEmailAuth} className="space-y-6">

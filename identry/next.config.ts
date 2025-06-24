@@ -10,6 +10,10 @@ const nextConfig: NextConfig = {
         pathname: '/storage/v1/object/public/**',
       },
     ],
+    domains: [
+      'lh3.googleusercontent.com',
+      'images.unsplash.com',
+    ],
   },
 };
 

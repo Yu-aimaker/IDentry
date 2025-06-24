@@ -129,6 +129,7 @@ export type Database = {
           created_at: string
           gender: string | null
           github: string | null
+          google_avatar_url: string | null
           id: string
           instagram: string | null
           is_public: boolean | null
@@ -159,6 +160,7 @@ export type Database = {
           created_at?: string
           gender?: string | null
           github?: string | null
+          google_avatar_url?: string | null
           id?: string
           instagram?: string | null
           is_public?: boolean | null
@@ -189,6 +191,7 @@ export type Database = {
           created_at?: string
           gender?: string | null
           github?: string | null
+          google_avatar_url?: string | null
           id?: string
           instagram?: string | null
           is_public?: boolean | null
@@ -338,4 +341,4 @@ export const Constants = {
   public: {
     Enums: {},
   },
-} as const 
+} as const

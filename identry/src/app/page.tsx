@@ -51,7 +51,7 @@ export default function Home() {
               今すぐはじめる
             </Link>
             <Link
-              href="/login"
+              href="/login?mode=login"
               className="text-blue-600 px-10 py-5 rounded-xl text-xl font-medium hover:bg-blue-50 hover:scale-105 transition-all duration-300 text-center border-2 border-blue-200 hover:border-blue-300"
             >
               ログイン

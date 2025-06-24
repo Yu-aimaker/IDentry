@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { saveFormDataLocally, getFormDataLocally, uploadTempProfileImage } from '../../../lib/supabase';
+import { saveFormDataLocally, getFormDataLocally, uploadTempProfileImage, getUserProfile, Profile, Education, Career, Portfolio, updateFullProfile, getGoogleAvatarUrl } from '../../../lib/supabase';
+import { useAuth } from '../../../lib/auth-context';
 
 interface FormData {
   name: string;
@@ -21,6 +22,7 @@ interface FormData {
   linkedin: string;
   github: string;
   skills: string[];
+  google_avatar_url?: string;
   education: Array<{
     school: string;
     degree: string;
@@ -57,6 +59,11 @@ export default function CreatePage() {
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [justCompletedStep, setJustCompletedStep] = useState<number | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+  const { user, loading } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  
   const [formData, setFormData] = useState<FormData>({
     name: '',
     birthYear: '',
@@ -72,24 +79,134 @@ export default function CreatePage() {
     linkedin: '',
     github: '',
     skills: [],
+    google_avatar_url: '',
     education: [],
     career: [],
     portfolio: []
   });
-  const router = useRouter();
 
-  // 初期化時にローカルストレージからデータを復元
+  // データベースのプロフィールデータをフォームデータ形式に変換
+  const convertProfileToFormData = (profile: Profile & { education?: Education[], career?: Career[], portfolio?: Portfolio[] }): FormData => {
+    return {
+      name: profile.name || '',
+      birthYear: profile.birth_year || '',
+      birthMonth: profile.birth_month || '',
+      birthDay: profile.birth_day || '',
+      birthDate: profile.birth_date || '',
+      gender: profile.gender || '',
+      address: profile.address || '',
+      photo: profile.photo || '',
+      bio: profile.bio || '',
+      twitter: profile.twitter || '',
+      instagram: profile.instagram || '',
+      linkedin: profile.linkedin || '',
+      github: profile.github || '',
+      skills: profile.skills || [],
+      google_avatar_url: profile.google_avatar_url || '',
+      education: profile.education?.map((edu) => ({
+        school: edu.school || '',
+        degree: edu.degree || '',
+        year: edu.year || ''
+      })) || [],
+      career: profile.career?.map((car) => ({
+        company: car.company || '',
+        position: car.position || '',
+        period: car.period || ''
+      })) || [],
+      portfolio: profile.portfolio?.map((port) => ({
+        title: port.title || '',
+        description: port.description || '',
+        url: port.url || '',
+        image: port.image || ''
+      })) || []
+    };
+  };
+
+  // 初期化時の処理
   useEffect(() => {
-    const savedData = getFormDataLocally();
-    if (savedData) {
-      setFormData(savedData);
-    }
-  }, []);
+    const initializeData = async () => {
+      if (loading) return;
+
+             // 編集モードかどうかを確認（URLパラメータまたはログイン状態）
+       const edit = searchParams.get('edit') === 'true' || !!user;
+
+      if (user && edit) {
+        // ログインユーザーの場合、データベースからプロフィールを取得
+        setIsLoadingProfile(true);
+        try {
+          const profile = await getUserProfile();
+          if (profile) {
+            const convertedData = convertProfileToFormData(profile);
+            setFormData(convertedData);
+            // プロフィールが存在する場合、完了済みステップを設定
+            const completed: number[] = [];
+            if (convertedData.name) completed.push(1);
+            if (convertedData.birthDate || (convertedData.birthYear && convertedData.birthMonth && convertedData.birthDay)) completed.push(2);
+            if (convertedData.gender) completed.push(3);
+            if (convertedData.address) completed.push(4);
+            if (convertedData.education.length > 0) completed.push(5);
+            if (convertedData.career.length > 0) completed.push(6);
+            if (convertedData.twitter || convertedData.instagram || convertedData.linkedin || convertedData.github) completed.push(7);
+            if (convertedData.skills.length > 0) completed.push(8);
+            if (convertedData.portfolio.length > 0) completed.push(9);
+            if (convertedData.bio) completed.push(10);
+            setCompletedSteps(completed);
+          } else {
+            // プロフィールが存在しない場合、Googleアバターを取得
+            const googleAvatarUrl = await getGoogleAvatarUrl();
+            if (googleAvatarUrl) {
+              setFormData(prev => ({ ...prev, google_avatar_url: googleAvatarUrl }));
+            }
+          }
+        } catch (error) {
+          console.error('プロフィール取得エラー:', error);
+          // エラーの場合はローカルストレージから復元
+          const savedData = getFormDataLocally();
+          if (savedData) {
+            setFormData(savedData);
+          }
+          // エラーの場合でもGoogleアバターを試行
+          try {
+            const googleAvatarUrl = await getGoogleAvatarUrl();
+            if (googleAvatarUrl) {
+              setFormData(prev => ({ ...prev, google_avatar_url: googleAvatarUrl }));
+            }
+          } catch (googleError) {
+            console.error('Googleアバター取得エラー:', googleError);
+          }
+        } finally {
+          setIsLoadingProfile(false);
+        }
+      } else {
+        // 未ログインまたは新規作成の場合、ローカルストレージから復元
+        const savedData = getFormDataLocally();
+        if (savedData) {
+          setFormData(savedData);
+        }
+      }
+    };
+
+    initializeData();
+  }, [user, loading, searchParams]);
 
   // フォームデータが変更されるたびにローカルストレージに保存
   useEffect(() => {
     saveFormDataLocally(formData as unknown as Record<string, unknown>);
   }, [formData]);
+
+  // ローディング中の表示
+  if (loading || isLoadingProfile) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">
+            {isLoadingProfile ? 'プロフィールを読み込み中...' : '読み込み中...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -97,7 +214,7 @@ export default function CreatePage() {
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     // バリデーション
     if (currentStep === 1 && !formData.name) {
       alert('名前を入力してください');
@@ -122,8 +239,57 @@ export default function CreatePage() {
     if (currentStep < 10) {
       setCurrentStep(currentStep + 1);
     } else {
-      // 全ステップ完了時にプレビューページへ
-      router.push('/preview');
+      // 全ステップ完了時の処理
+      if (user) {
+        // ログインユーザーの場合、データベースに保存
+        try {
+          setIsLoadingProfile(true);
+          const result = await updateFullProfile({
+            name: formData.name,
+            birth_year: formData.birthYear,
+            birth_month: formData.birthMonth,
+            birth_day: formData.birthDay,
+            birth_date: formData.birthDate,
+            gender: formData.gender,
+            address: formData.address,
+            photo: formData.photo,
+            bio: formData.bio,
+            twitter: formData.twitter,
+            instagram: formData.instagram,
+            linkedin: formData.linkedin,
+            github: formData.github,
+            skills: formData.skills,
+            google_avatar_url: formData.google_avatar_url,
+            education: formData.education,
+            career: formData.career,
+            portfolio: formData.portfolio
+          });
+          // 未認証時はnullが返るので通常プレビューへ
+          if (result === null) {
+            router.push('/preview');
+          } else {
+            // 成功した場合はローカルストレージをクリア
+            // clearFormDataLocally();
+            router.push('/preview?from=edit');
+          }
+        } catch (error) {
+          console.error('プロフィール保存エラー:', error);
+          let errorMessage = 'プロフィールの保存に失敗しました。もう一度お試しください。';
+          
+          if (error instanceof Error) {
+            errorMessage = error.message;
+          } else if (typeof error === 'string') {
+            errorMessage = error;
+          }
+          
+          alert(errorMessage);
+        } finally {
+          setIsLoadingProfile(false);
+        }
+      } else {
+        // 未ログインの場合は通常通りプレビューへ
+        router.push('/preview');
+      }
     }
   };
 
@@ -139,6 +305,22 @@ export default function CreatePage() {
 
   const updateFormData = (field: keyof FormData, value: string | string[] | FormData[keyof FormData]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // 作成ページ用の画像表示ロジック
+  const getCreateImageUrl = (data: FormData): string | null => {
+    // 1. 設定されたプロフィール画像があれば優先
+    if (data.photo) {
+      return data.photo;
+    }
+    
+    // 2. Googleアバターがあれば使用
+    if (data.google_avatar_url) {
+      return data.google_avatar_url;
+    }
+    
+    // 3. どちらもない場合はnull
+    return null;
   };
 
   const handleDateChange = (dateValue: string) => {
@@ -226,7 +408,11 @@ export default function CreatePage() {
     <div className="min-h-screen bg-white" onKeyDown={handleKeyPress}>
       {/* ヘッダー */}
       <header className="border-b border-gray-100">
-        <div className="max-w-4xl mx-auto px-4 py-6 flex justify-center">
+        <div className="max-w-4xl mx-auto px-4 py-6 flex justify-between items-center">
+          {/* 左側：スペーサー（レイアウトバランス用） */}
+          <div className="w-24"></div>
+          
+          {/* 中央：ロゴ */}
           <Link href="/" className="cursor-pointer hover:opacity-80 transition-opacity duration-200">
             <Image
               src="/img/banner.png"
@@ -236,6 +422,18 @@ export default function CreatePage() {
               className="h-15 object-contain"
             />
           </Link>
+          
+          {/* 右側：マイページボタン（ログイン時のみ表示） */}
+          <div className="flex justify-end">
+            {user && (
+              <Link
+                href="/dashboard"
+                className="px-6 py-2 bg-white text-blue-600 border-2 border-blue-600 rounded-lg hover:bg-blue-50 transition-all duration-200 text-sm font-medium shadow-sm hover:shadow-md"
+              >
+                マイページ
+              </Link>
+            )}
+          </div>
         </div>
       </header>
 
@@ -332,24 +530,26 @@ export default function CreatePage() {
                 
                 {/* 画像プレビューまたはアップロードエリア */}
                 <div className="flex flex-col items-center space-y-4">
-                  {formData.photo ? (
+                  {getCreateImageUrl(formData) ? (
                     /* 画像プレビュー */
                     <div className="relative">
                       <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-blue-200 shadow-lg">
                         <Image
-                          src={formData.photo}
+                          src={getCreateImageUrl(formData)!}
                           alt="プロフィール画像"
                           width={128}
                           height={128}
                           className="w-full h-full object-cover"
                         />
                       </div>
-                      <button
-                        onClick={() => updateFormData('photo', '')}
-                        className="absolute -top-2 -right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
-                      >
-                        ✕
-                      </button>
+                      {formData.photo && (
+                        <button
+                          onClick={() => updateFormData('photo', '')}
+                          className="absolute -top-2 -right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                        >
+                          ✕
+                        </button>
+                      )}
                     </div>
                   ) : (
                     /* アップロードエリア */
