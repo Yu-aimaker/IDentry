@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../lib/auth-context';
 import { getFormDataLocally, clearFormDataLocally, createProfile, addEducation, addCareer, addPortfolio, getUserProfile, updateProfile, getGoogleAvatarUrl } from '../../../lib/supabase';
 
-export default function LoginPage() {
+function LoginPageContent() {
   const [isLogin, setIsLogin] = useState(true); // デフォルトはログインモード
   const searchParams = useSearchParams();
 
@@ -471,5 +471,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div>読み込み中...</div>}>
+      <LoginPageContent />
+    </Suspense>
   );
 }
