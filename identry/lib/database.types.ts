@@ -148,6 +148,7 @@ export type Database = {
           updated_at: string
           user_id: string | null
           views_count: number | null
+          custom_id: string | null
         }
         Insert: {
           address?: string | null
@@ -179,6 +180,7 @@ export type Database = {
           updated_at?: string
           user_id?: string | null
           views_count?: number | null
+          custom_id?: string | null
         }
         Update: {
           address?: string | null
@@ -210,6 +212,7 @@ export type Database = {
           updated_at?: string
           user_id?: string | null
           views_count?: number | null
+          custom_id?: string | null
         }
         Relationships: []
       }

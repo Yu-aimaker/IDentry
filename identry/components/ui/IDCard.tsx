@@ -51,17 +51,8 @@ export const cardDesigns: CardDesign[] = [
     pattern: "modern"
   },
   {
-    id: "minimal-dark",
-    name: "Minimal Dark",
-    background: "linear-gradient(135deg, hsl(var(--background) / 0.9) 0%, hsl(var(--card) / 0.9) 100%)",
-    textColor: "text-foreground",
-    accentColor: "hsl(var(--primary))",
-    borderColor: "hsl(var(--border))",
-    pattern: "minimal"
-  },
-  {
     id: "pasmo",
-    name: "PASMO Style",
+    name: "デフォルト",
     background: "linear-gradient(135deg, #00A0E9 0%, #0066CC 100%)",
     textColor: "text-white",
     accentColor: "#FFD700",

@@ -29,7 +29,7 @@ function LoginPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const router = useRouter();
-  const { signIn, signUp, signInWithGoogle } = useAuth();
+  const { signIn, signUp, signInWithGoogle, user, loading } = useAuth();
 
   // エラーメッセージをクリアする関数
   const clearMessages = () => {
@@ -103,6 +103,12 @@ function LoginPageContent() {
       
       if (existingProfile) {
         // 既存プロフィールを更新
+        // Google avatar は写真がない場合のみ取得
+        let googleAvatarUrl = existingProfile.google_avatar_url;
+        if (!formData.photo && !existingProfile.photo && !existingProfile.google_avatar_url) {
+          googleAvatarUrl = await getGoogleAvatarUrl();
+        }
+        
         const updatedProfile = await updateProfile({
           name: formData.name || existingProfile.name,
           birth_year: formData.birthYear || existingProfile.birth_year,
@@ -118,7 +124,7 @@ function LoginPageContent() {
           linkedin: formData.linkedin || existingProfile.linkedin,
           github: formData.github || existingProfile.github,
           skills: formData.skills && formData.skills.length > 0 ? formData.skills : existingProfile.skills,
-          google_avatar_url: await getGoogleAvatarUrl() || existingProfile.google_avatar_url
+          google_avatar_url: googleAvatarUrl
         });
 
         console.log('プロフィールを更新しました:', updatedProfile);
@@ -143,7 +149,11 @@ function LoginPageContent() {
 
         // 学歴を追加
         if (formData.education && Array.isArray(formData.education)) {
-          for (const edu of formData.education) {
+          // 重複除去
+          const uniqueEducation = formData.education.filter((edu: { school: string; degree: string; year: string }, idx: number, arr: { school: string; degree: string; year: string }[]) =>
+            arr.findIndex((e: { school: string; degree: string; year: string }) => e.school === edu.school && e.degree === edu.degree && e.year === edu.year) === idx
+          );
+          for (const edu of uniqueEducation) {
             await addEducation(profile.id, edu);
           }
         }
@@ -157,7 +167,11 @@ function LoginPageContent() {
 
         // ポートフォリオを追加
         if (formData.portfolio && Array.isArray(formData.portfolio)) {
-          for (const port of formData.portfolio) {
+          // 重複除去
+          const uniquePortfolio = formData.portfolio.filter((port: { title: string; description: string; url: string; image: string }, idx: number, arr: { title: string; description: string; url: string; image: string }[]) =>
+            arr.findIndex((p: { title: string; description: string; url: string; image: string }) => p.title === port.title && p.description === port.description && p.url === port.url && p.image === port.image) === idx
+          );
+          for (const port of uniquePortfolio) {
             await addPortfolio(profile.id, port);
           }
         }
@@ -182,17 +196,21 @@ function LoginPageContent() {
     try {
       setIsLoading(true);
       clearMessages();
+      
+      // ローカルストレージにデータがある場合はフラグを設定
+      const formData = getFormDataLocally();
+      const hasLocalData = formData && (formData.name || formData.bio || formData.skills?.length > 0);
+      
+      if (hasLocalData) {
+        // ローカルストレージにデータがある場合、フラグを一時保存
+        localStorage.setItem('pending_form_data_save', 'true');
+      }
+      
       await signInWithGoogle();
-      
-      // フォームデータが保存されている場合、データベースに保存
-      await saveFormDataToDatabase();
-      
-      setSuccess('Googleログインに成功しました！');
-      router.push('/dashboard');
+      // Note: Google認証後は/dashboardにリダイレクトされるため、ここの後続処理は実行されない
     } catch (error) {
       console.error('Googleログインエラー:', error);
       setError(getErrorMessage(error));
-    } finally {
       setIsLoading(false);
     }
   };
@@ -235,6 +253,13 @@ function LoginPageContent() {
       setIsLoading(false);
     }
   };
+
+  // 2回目以降の自動ログイン時、マイページへリダイレクト
+  useEffect(() => {
+    if (!loading && user) {
+      router.replace('/dashboard');
+    }
+  }, [user, loading, router]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">

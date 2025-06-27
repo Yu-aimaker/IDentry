@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { saveFormDataLocally, getFormDataLocally, uploadTempProfileImage, getUserProfile, Profile, Education, Career, Portfolio, updateFullProfile, getGoogleAvatarUrl } from '../../../lib/supabase';
+import { saveFormDataLocally, getFormDataLocally, uploadTempProfileImage, getUserProfile, Profile, Education, Career, Portfolio, updateFullProfile, getGoogleAvatarUrl, clearFormDataLocally } from '../../../lib/supabase';
 import { useAuth } from '../../../lib/auth-context';
 
 interface FormData {
@@ -151,6 +151,8 @@ function CreatePage() {
             if (convertedData.portfolio.length > 0) completed.push(9);
             if (convertedData.bio) completed.push(10);
             setCompletedSteps(completed);
+            // ローカルストレージも上書き
+            saveFormDataLocally((convertedData as unknown) as Record<string, unknown>);
           } else {
             // プロフィールが存在しない場合、Googleアバターを取得
             const googleAvatarUrl = await getGoogleAvatarUrl();
@@ -264,12 +266,11 @@ function CreatePage() {
             career: formData.career,
             portfolio: formData.portfolio
           });
-          // 未認証時はnullが返るので通常プレビューへ
           if (result === null) {
+            clearFormDataLocally();
             router.push('/preview');
           } else {
-            // 成功した場合はローカルストレージをクリア
-            // clearFormDataLocally();
+            clearFormDataLocally();
             router.push('/preview?from=edit');
           }
         } catch (error) {
@@ -363,6 +364,13 @@ function CreatePage() {
     }));
   };
 
+  const removeArrayItem = (field: 'education' | 'career' | 'portfolio', index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: (prev[field] as unknown[]).filter((_, i) => i !== index) as FormData[typeof field]
+    }));
+  };
+
   // 画像アップロード処理
   const handleImageUpload = async (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -408,32 +416,31 @@ function CreatePage() {
     <div className="min-h-screen bg-white" onKeyDown={handleKeyPress}>
       {/* ヘッダー */}
       <header className="border-b border-gray-100">
-        <div className="max-w-4xl mx-auto px-4 py-6 flex justify-between items-center">
-          {/* 左側：スペーサー（レイアウトバランス用） */}
-          <div className="w-24"></div>
-          
+        <div className="max-w-4xl mx-auto px-4 py-6 relative">
           {/* 中央：ロゴ */}
-          <Link href="/" className="cursor-pointer hover:opacity-80 transition-opacity duration-200">
-            <Image
-              src="/img/banner.png"
-              alt="IDentry Banner"
-              width={200}
-              height={80}
-              className="h-15 object-contain"
-            />
-          </Link>
+          <div className="flex justify-center">
+            <Link href="/" className="cursor-pointer hover:opacity-80 transition-opacity duration-200">
+              <Image
+                src="/img/banner.png"
+                alt="IDentry Banner"
+                width={200}
+                height={80}
+                className="h-15 object-contain"
+              />
+            </Link>
+          </div>
           
           {/* 右側：マイページボタン（ログイン時のみ表示） */}
-          <div className="flex justify-end">
-            {user && (
+          {user && (
+            <div className="absolute right-0 top-1/2 transform -translate-y-1/2">
               <Link
                 href="/dashboard"
                 className="px-6 py-2 bg-white text-blue-600 border-2 border-blue-600 rounded-lg hover:bg-blue-50 transition-all duration-200 text-sm font-medium shadow-sm hover:shadow-md"
               >
                 マイページ
               </Link>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </header>
 
@@ -748,6 +755,7 @@ function CreatePage() {
             <EducationInput
               education={formData.education}
               addEducation={(item) => addArrayItem('education', item)}
+              removeEducation={(index) => removeArrayItem('education', index)}
             />
           )}
 
@@ -831,6 +839,7 @@ function CreatePage() {
             <PortfolioInput
               portfolio={formData.portfolio}
               addPortfolio={(item) => addArrayItem('portfolio', item)}
+              removePortfolio={(index) => removeArrayItem('portfolio', index)}
             />
           )}
 
@@ -977,9 +986,10 @@ function SkillsInput({ skills, updateSkills }: { skills: string[], updateSkills:
 }
 
 // 学歴入力コンポーネント
-function EducationInput({ education, addEducation }: { 
+function EducationInput({ education, addEducation, removeEducation }: { 
   education: Array<{ school: string; degree: string; year: string }>, 
-  addEducation: (item: { school: string; degree: string; year: string }) => void 
+  addEducation: (item: { school: string; degree: string; year: string }) => void,
+  removeEducation: (index: number) => void
 }) {
   const [school, setSchool] = useState('');
   const [degree, setDegree] = useState('');
@@ -987,6 +997,12 @@ function EducationInput({ education, addEducation }: {
 
   const handleAdd = () => {
     if (school.trim()) {
+      // 重複チェック
+      const isDuplicate = education.some(e => e.school === school.trim() && e.degree === degree.trim() && e.year === year.trim());
+      if (isDuplicate) {
+        alert('同じ学歴が既に追加されています');
+        return;
+      }
       addEducation({ school: school.trim(), degree: degree.trim(), year: year.trim() });
       setSchool('');
       setDegree('');
@@ -1030,10 +1046,19 @@ function EducationInput({ education, addEducation }: {
         <div className="space-y-3">
           <h3 className="font-medium text-black">追加済みの学歴</h3>
           {education.map((item, index) => (
-            <div key={index} className="p-4 bg-gray-50 rounded-lg">
-              <div className="font-medium">{item.school}</div>
-              <div className="text-gray-600">{item.degree}</div>
-              <div className="text-sm text-gray-500">{item.year}</div>
+            <div key={index} className="p-4 bg-gray-50 rounded-lg flex justify-between items-start">
+              <div>
+                <div className="font-medium">{item.school}</div>
+                <div className="text-gray-600">{item.degree}</div>
+                <div className="text-sm text-gray-500">{item.year}</div>
+              </div>
+              <button
+                onClick={() => removeEducation(index)}
+                className="ml-4 w-7 h-7 flex items-center justify-center bg-gray-200 text-gray-600 rounded-full hover:bg-gray-300 text-base font-bold"
+                aria-label="削除"
+              >
+                ×
+              </button>
             </div>
           ))}
         </div>
@@ -1109,9 +1134,10 @@ function CareerInput({ career, addCareer }: {
 }
 
 // ポートフォリオ入力コンポーネント
-function PortfolioInput({ portfolio, addPortfolio }: { 
+function PortfolioInput({ portfolio, addPortfolio, removePortfolio }: { 
   portfolio: Array<{ title: string; description: string; url: string; image: string }>, 
-  addPortfolio: (item: { title: string; description: string; url: string; image: string }) => void 
+  addPortfolio: (item: { title: string; description: string; url: string; image: string }) => void,
+  removePortfolio: (index: number) => void
 }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -1120,6 +1146,12 @@ function PortfolioInput({ portfolio, addPortfolio }: {
 
   const handleAdd = () => {
     if (title.trim()) {
+      // 重複チェック
+      const isDuplicate = portfolio.some(p => p.title === title.trim() && p.description === description.trim() && p.url === url.trim() && p.image === image.trim());
+      if (isDuplicate) {
+        alert('同じポートフォリオが既に追加されています');
+        return;
+      }
       addPortfolio({ 
         title: title.trim(), 
         description: description.trim(), 
@@ -1176,19 +1208,28 @@ function PortfolioInput({ portfolio, addPortfolio }: {
         <div className="space-y-3">
           <h3 className="font-medium text-black">追加済みのポートフォリオ</h3>
           {portfolio.map((item, index) => (
-            <div key={index} className="p-4 bg-gray-50 rounded-lg">
-              <div className="font-medium">{item.title}</div>
-              <div className="text-gray-600 text-sm mb-2">{item.description}</div>
-              {item.url && (
-                <a 
-                  href={item.url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline text-sm"
-                >
-                  {item.url}
-                </a>
-              )}
+            <div key={index} className="p-4 bg-gray-50 rounded-lg flex justify-between items-start">
+              <div>
+                <div className="font-medium">{item.title}</div>
+                <div className="text-gray-600 text-sm mb-2">{item.description}</div>
+                {item.url && (
+                  <a 
+                    href={item.url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline text-sm"
+                  >
+                    {item.url}
+                  </a>
+                )}
+              </div>
+              <button
+                onClick={() => removePortfolio(index)}
+                className="ml-4 w-7 h-7 flex items-center justify-center bg-gray-200 text-gray-600 rounded-full hover:bg-gray-300 text-base font-bold"
+                aria-label="削除"
+              >
+                ×
+              </button>
             </div>
           ))}
         </div>

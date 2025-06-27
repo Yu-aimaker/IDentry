@@ -1,439 +1,456 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, ReactElement } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useAuth } from '../../../lib/auth-context';
-import { getUserProfile, updateBlockVisibility, Profile, getProfileImageUrl, uploadProfileImage, updateFullProfile } from '../../../lib/supabase';
+import { getUserProfile, updateBlockVisibility, Profile, getProfileImageUrl, uploadProfileImage, updateProfile, updateProfileVisibility, getFormDataLocally, clearFormDataLocally, updateFullProfile } from '../../../lib/supabase';
 import { IDCardProfile } from "../../../components/ui/IDCardProfile";
-import { Github, Twitter, Instagram, Linkedin } from "lucide-react";
+import { motion } from "framer-motion";
+import { FaTwitter, FaGithub, FaInstagram, FaLinkedin, FaGlobe, FaLink, FaGraduationCap, FaLightbulb } from 'react-icons/fa';
+import { Briefcase, User, QrCode, LogOut, Edit, Eye, Check, X, Settings } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
+
+// Reusable Switch component
+function Switch({ checked, onChange }: { checked: boolean, onChange: (checked: boolean) => void }) {
+    return (
+        <label className="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="sr-only peer" />
+            <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+        </label>
+    );
+}
+
+// Reusable Section with edit/visibility controls
+function Section({ title, icon, children, isPublic, onToggleVisibility, editHref }: { title: string, icon: ReactElement, children: React.ReactNode, isPublic?: boolean, onToggleVisibility?: () => void, editHref?: string }) {
+  return (
+    <motion.section 
+      className="mb-12"
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      viewport={{ once: true, amount: 0.3 }}
+    >
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center">
+            <div className="text-gray-500 bg-white/80 backdrop-blur-sm rounded-full p-3 mr-4 border border-gray-200/80 shadow-sm">{icon}</div>
+            <h2 className="text-2xl font-bold text-gray-800 tracking-wider">{title}</h2>
+        </div>
+        <div className="flex items-center gap-4">
+            {onToggleVisibility && (
+                 <div className="flex items-center gap-2">
+                    <Switch checked={!!isPublic} onChange={onToggleVisibility} />
+                    <span className="text-sm font-medium text-gray-600">{isPublic ? '公開' : '非公開'}</span>
+                 </div>
+            )}
+            {editHref && (
+                 <Link href={editHref} className="p-2 rounded-full hover:bg-gray-200/80 transition-colors">
+                    <Edit className="w-5 h-5 text-gray-600" />
+                 </Link>
+            )}
+        </div>
+      </div>
+      <div className="pl-4">{children}</div>
+    </motion.section>
+  );
+}
+
+
+function SNSLinks({ twitter, instagram, linkedin, github }: { twitter?: string, instagram?: string, linkedin?: string, github?: string }) {
+    const sns = [
+      { href: twitter ? `https://twitter.com/${twitter.replace(/^@/, "")}` : '', icon: <FaTwitter size={24} />, label: 'Twitter', show: !!twitter },
+      { href: instagram ? `https://instagram.com/${instagram.replace(/^@/, "")}` : '', icon: <FaInstagram size={24} />, label: 'Instagram', show: !!instagram },
+      { href: linkedin ? `https://linkedin.com/in/${linkedin.replace(/^@/, "")}` : '', icon: <FaLinkedin size={24} />, label: 'LinkedIn', show: !!linkedin },
+      { href: github ? `https://github.com/${github.replace(/^@/, "")}` : '', icon: <FaGithub size={24} />, label: 'GitHub', show: !!github },
+    ];
+  
+    return (
+      <div className="flex flex-wrap gap-6 items-center">
+        {sns.map((item, index) => item.show && (
+          <a key={index} href={item.href} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-blue-500 transition-colors duration-300 transform hover:scale-110" aria-label={item.label}>
+            {item.icon}
+          </a>
+        ))}
+        {!sns.some(s => s.show) && <p className="text-gray-500 text-sm">SNSアカウントがまだリンクされていません。</p>}
+      </div>
+    );
+}
 
 export default function MyPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [showQRModal, setShowQRModal] = useState(false);
-  const { user, loading, signOut } = useAuth();
+  const [editingId, setEditingId] = useState(false);
+  const [idValue, setIdValue] = useState('');
+  const [idError, setIdError] = useState<string | null>(null);
+  const { user, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
-  const getInitialVariant = (): 'pasmo' | 'credit' | 'corporate' | 'metro' => {
-    if (typeof window !== 'undefined') {
-      const v = localStorage.getItem('card_variant');
-      if (v === 'pasmo' || v === 'credit' || v === 'corporate' || v === 'metro') return v;
-    }
-    return 'pasmo';
-  };
-  const [cardVariant, setCardVariant] = useState<'pasmo' | 'credit' | 'corporate' | 'metro'>(getInitialVariant);
-  const [showPreset, setShowPreset] = useState(false);
-  const cardAreaRef = useRef<HTMLDivElement>(null);
-
+  
+  const [cardVariant, setCardVariant] = useState<'pasmo' | 'credit' | 'corporate' | 'metro' | 'custom'>('pasmo');
+  const [customColor, setCustomColor] = useState('#8B5CF6');
+  
   useEffect(() => {
-    const loadProfile = async () => {
-      if (loading) return;
-      
-      if (!user) {
-        router.push('/login');
-        return;
-      }
-
-      try {
-        const userProfile = await getUserProfile();
-        setProfile(userProfile);
-      } catch (error) {
-        console.error('プロフィール取得エラー:', error);
-      }
-    };
-
-    loadProfile();
-  }, [user, loading, router]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const v = localStorage.getItem('card_variant');
-      if (v === 'pasmo' || v === 'credit' || v === 'corporate' || v === 'metro') setCardVariant(v);
-    }
+    const v = localStorage.getItem('card_variant') as 'pasmo' | 'credit' | 'corporate' | 'metro' | 'custom' | null;
+    if (v) setCardVariant(v);
+    const c = localStorage.getItem('custom_color');
+    if (c) setCustomColor(c);
   }, []);
 
-  const handleToggleBlockVisibility = async (blockType: string, currentValue: boolean) => {
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    const loadProfile = async () => {
+      try {
+        setLoadingProfile(true);
+        
+        // Google認証後のローカルストレージ保存処理をチェック
+        const shouldSaveFormData = localStorage.getItem('pending_form_data_save');
+        if (shouldSaveFormData) {
+          const formData = getFormDataLocally();
+          if (formData) {
+            try {
+              await updateFullProfile({
+                name: formData.name || '',
+                birth_year: formData.birthYear || '',
+                birth_month: formData.birthMonth || '',
+                birth_day: formData.birthDay || '',
+                birth_date: formData.birthDate || '',
+                gender: formData.gender || '',
+                address: formData.address || '',
+                photo: formData.photo || '',
+                bio: formData.bio || '',
+                twitter: formData.twitter || '',
+                instagram: formData.instagram || '',
+                linkedin: formData.linkedin || '',
+                github: formData.github || '',
+                skills: formData.skills || [],
+                education: formData.education || [],
+                career: formData.career || [],
+                portfolio: formData.portfolio || []
+              });
+              
+              // 保存後にクリーンアップ
+              clearFormDataLocally();
+              localStorage.removeItem('pending_form_data_save');
+              console.log('Google認証後のフォームデータをDBに保存しました');
+            } catch (error) {
+              console.error('Google認証後のフォームデータ保存エラー:', error);
+            }
+          }
+        }
+        
+        const userProfile = await getUserProfile();
+        setProfile(userProfile);
+        setIdValue(userProfile?.custom_id || '');
+      } catch (error) {
+        console.error('プロフィール取得エラー:', error);
+      } finally {
+        setLoadingProfile(false);
+      }
+    };
+    loadProfile();
+  }, [user, authLoading, router]);
+  
+  const handleToggleBlockVisibility = async (blockType: 'sns' | 'skills' | 'education' | 'career' | 'portfolio') => {
     if (!profile) return;
+    const key = `show_${blockType}` as keyof Profile;
+    const currentValue = profile[key];
+
+    // Optimistic update
+    setProfile(prev => prev ? { ...prev, [key]: !currentValue } as Profile : null);
 
     try {
-      const updateData = { [`show_${blockType}`]: !currentValue };
-      await updateBlockVisibility(updateData);
-      setProfile(prev => prev ? { ...prev, ...updateData } : null);
+      await updateBlockVisibility({ [key]: !currentValue });
     } catch (error) {
       console.error('公開設定更新エラー:', error);
+      // Revert on error
+      setProfile(prev => prev ? { ...prev, [key]: currentValue } as Profile : null);
+      alert('更新に失敗しました。');
     }
   };
 
   const handleLogout = async () => {
     if (confirm('ログアウトしますか？')) {
-      try {
-        await signOut();
-        router.push('/');
-      } catch (error) {
-        console.error('ログアウトエラー:', error);
-      }
-    }
-  };
-
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      alert('URLをクリップボードにコピーしました！');
-    } catch (err) {
-      console.error('コピーに失敗しました:', err);
+      await signOut();
+      router.push('/');
     }
   };
 
   const handleVariantChange = (v: string) => {
-    setCardVariant(v as 'pasmo' | 'credit' | 'corporate' | 'metro');
-    if (typeof window !== 'undefined') localStorage.setItem('card_variant', v);
-    setShowPreset(false);
+    setCardVariant(v as 'pasmo' | 'credit' | 'corporate' | 'metro' | 'custom');
+    localStorage.setItem('card_variant', v);
   };
 
+  const handleCustomColorChange = (color: string) => {
+    setCustomColor(color);
+    localStorage.setItem('custom_color', color);
+  };
+
+  const handleSaveId = async (newId: string) => {
+    if (!profile) return;
+    setIdError(null);
+    try {
+      await updateProfile({ custom_id: newId });
+      const updated = await getUserProfile();
+      setProfile(updated);
+      setEditingId(false);
+      setIdValue(newId);
+    } catch (error) {
+      console.error('ID更新エラー:', error);
+      if (error instanceof Error) {
+        setIdError(error.message);
+      } else {
+        setIdError('IDの更新に失敗しました');
+      }
+      throw error;
+    }
+  };
+
+  const publicProfileUrl = profile?.custom_id ? `${window.location.origin}/preview?id=${profile.custom_id}` : null;
+
+  if (authLoading || loadingProfile) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* 認証状態の読み込み中 */}
-      {loading && (
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">読み込み中...</p>
+    <div className="bg-gray-50/50 font-sans">
+      <header className="bg-white/80 backdrop-blur-lg border-b border-gray-100 sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 flex justify-center">
+              <Image src="/img/banner.png" alt="IDentry Banner" width={320} height={60} className="h-12 w-auto object-contain mx-auto" />
+            </div>
+            <div className="flex items-center space-x-2 absolute right-4 top-1/2 -translate-y-1/2">
+                <button onClick={() => setShowQRModal(true)} className="p-2 rounded-full hover:bg-gray-200/80 transition-colors">
+                    <QrCode className="w-6 h-6 text-gray-700" />
+                </button>
+                <button onClick={handleLogout} className="p-2 rounded-full hover:bg-gray-200/80 transition-colors">
+                    <LogOut className="w-6 h-6 text-red-500" />
+                </button>
+            </div>
           </div>
         </div>
-      )}
+      </header>
 
-      {/* 認証済みでロード完了後の表示 */}
-      {!loading && user && (
-        <>
-          {/* ヘッダー */}
-          <header className="bg-white border-b border-gray-100">
-            <div className="max-w-4xl mx-auto px-4 py-4">
-              <div className="flex items-center justify-between">
-                <Link href="/" className="flex items-center">
-                  <Image
-                    src="/img/banner.png"
-                    alt="IDentry Banner"
-                    width={160}
-                    height={64}
-                    className="h-10 object-contain cursor-pointer hover:opacity-80 transition-opacity duration-200"
-                  />
-                </Link>
-                
-                <div className="flex items-center space-x-4">
-                  <span className="text-gray-600">こんにちは、{profile?.nickname || profile?.name || 'ユーザー'}さん</span>
-                  <button
-                    onClick={handleLogout}
-                    className="text-gray-500 hover:text-gray-700 transition-colors"
-                  >
-                    ログアウト
-                  </button>
-                </div>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+          {/* Left Column */}
+          <div className="lg:col-span-1 lg:sticky top-28 h-full">
+            <IDCardProfile
+              profileData={{
+                name: profile?.nickname || profile?.name || "",
+                title: (profile?.bio || '').split('\n')[0] || "",
+                department: "",
+                employeeId: profile?.custom_id || "",
+                joinDate: profile?.created_at ? new Date(profile.created_at).toLocaleDateString('ja-JP') : "",
+                email: user?.email || "",
+                avatar: getProfileImageUrl(profile) || undefined,
+              }}
+              variant={cardVariant}
+              onVariantChange={handleVariantChange}
+              customColor={customColor}
+              onCustomColorChange={handleCustomColorChange}
+              showPresetSelector
+              enableAvatarUpload
+              onAvatarUpload={async (file) => {
+                if (!profile) return;
+                const url = await uploadProfileImage(file);
+                const { education, career, portfolio, ...profileFields } = profile;
+                void education; void career; void portfolio;
+                await updateProfile({ ...profileFields, photo: url });
+                const updated = await getUserProfile();
+                setProfile(updated);
+              }}
+              onSaveId={handleSaveId}
+            />
+            <div className="mt-6">
+              {/* 公開/非公開スイッチ追加 */}
+              <div className="flex items-center justify-center mb-4 gap-2">
+                <Switch
+                  checked={!!profile?.is_public}
+                  onChange={async (checked) => {
+                    if (!profile) return;
+                    // 楽観的更新
+                    setProfile(prev => prev ? { ...prev, is_public: checked } as Profile : null);
+                    try {
+                      // DB更新
+                      await updateProfileVisibility(profile.id, checked);
+                    } catch {
+                      // 失敗時は元に戻す
+                      setProfile(prev => prev ? { ...prev, is_public: !checked } as Profile : null);
+                      alert('公開設定の更新に失敗しました');
+                    }
+                  }}
+                />
+                <span className="text-sm font-medium text-gray-600">{profile?.is_public ? '公開中' : '非公開'}</span>
               </div>
-            </div>
-          </header>
-
-          <div className="max-w-4xl mx-auto px-4 py-8">
-            {/* ページタイトル */}
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-black mb-2">マイページ</h1>
-              <p className="text-gray-600">あなたのプロフィールを管理・編集できます</p>
-            </div>
-
-            {!profile ? (
-              /* プロフィール未作成 */
-              <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
-                <div className="text-6xl mb-4">📝</div>
-                <h3 className="text-xl font-semibold text-black mb-2">プロフィールがありません</h3>
-                <p className="text-gray-600 mb-6">最初のプロフィールを作成してみましょう！</p>
-                <Link
-                  href="/create"
-                  className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors inline-block"
+              {publicProfileUrl ? (
+                <a 
+                  href={publicProfileUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 px-6 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                 >
-                  プロフィールを作成
-                </Link>
-              </div>
-            ) : (
-              /* プロフィール管理エリア */
-              <div className="space-y-6">
-                {/* カード中央寄せ・大きさ調整＋ボタン配置 */}
-                <div className="flex flex-col items-center justify-center">
-                  <div className="w-full max-w-md relative" ref={cardAreaRef}>
-                    {/* デザイン変更ボタン */}
-                    <button
-                      className="absolute top-2 right-2 z-10 bg-white/80 border border-gray-200 rounded-full px-3 py-1 text-xs font-medium shadow hover:bg-white"
-                      onClick={() => setShowPreset((v) => !v)}
-                    >
-                      デザイン変更
-                    </button>
-                    {/* プリセット選択UI（ポップオーバー） */}
-                    {showPreset && (
-                      <div className="absolute top-10 right-0 z-20 bg-white border border-gray-200 rounded-xl shadow-lg p-4 w-64">
-                        <IDCardProfile
-                          showPresetSelector
-                          variant={cardVariant}
-                          onVariantChange={handleVariantChange}
+                  <Eye className="w-5 h-5" />
+                  <span>公開ページをプレビュー</span>
+                </a>
+              ) : (
+                <div className="space-y-3">
+                  {/* ID登録ボタンとフォーム */}
+                  {!editingId ? (
+                    <div className="text-center bg-gradient-to-br from-orange-50 to-red-50 border border-dashed border-orange-300 p-4 rounded-xl">
+                      <p className="text-sm text-gray-600 font-medium mb-2">公開ページはまだありません。</p>
+                      <p className="text-xs text-gray-500 mb-4">IDカードのIDを設定すると有効になります。</p>
+                      <button
+                        onClick={() => setEditingId(true)}
+                        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold py-3 px-6 rounded-xl hover:from-orange-600 hover:to-red-600 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                      >
+                        <Settings className="w-5 h-5" />
+                        <span>IDを登録する</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                      <div className="space-y-3">
+                        <label className="block text-sm font-medium text-gray-700">
+                          IDを設定してください
+                        </label>
+                        <input
+                          type="text"
+                          value={idValue}
+                          onChange={(e) => {
+                            setIdValue(e.target.value);
+                            setIdError(null);
+                          }}
+                          placeholder="例: my-profile-id"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          maxLength={32}
                         />
-                        <button
-                          className="mt-4 w-full text-sm text-gray-500 hover:text-black"
-                          onClick={() => setShowPreset(false)}
-                        >閉じる</button>
-                      </div>
-                    )}
-                    <IDCardProfile
-                      profileData={{
-                        name: profile.nickname || profile.name,
-                        title: profile.bio || "",
-                        department: "",
-                        employeeId: profile.id || "",
-                        joinDate: profile.created_at ? new Date(profile.created_at).toLocaleDateString() : "",
-                        email: user?.email || "",
-                        avatar: getProfileImageUrl(profile) || undefined,
-                      }}
-                      variant={cardVariant}
-                      enableAvatarUpload
-                      onAvatarUpload={async (file) => {
-                        // 画像アップロード→プロフィール更新→再取得
-                        const url = await uploadProfileImage(file);
-                        await updateFullProfile({ ...profile, photo: url });
-                        const updated = await getUserProfile();
-                        setProfile(updated);
-                      }}
-                    />
-                  </div>
-                  {/* 新・詳細セクション */}
-                  <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-2xl">
-                    {/* スキル */}
-                    {profile.skills && profile.skills.length > 0 && (
-                      <div className="bg-white/80 rounded-xl shadow p-6 flex flex-col">
-                        <h3 className="text-lg font-bold mb-3 flex items-center gap-2">💡 スキル</h3>
-                        <div className="flex flex-wrap gap-2">
-                          {profile.skills.map((skill: string, i: number) => (
-                            <span key={i} className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                              {skill}
-                            </span>
-                          ))}
+                        {idError && (
+                          <p className="text-xs text-red-500">{idError}</p>
+                        )}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={async () => {
+                              try {
+                                await handleSaveId(idValue);
+                              } catch {
+                                // エラーは handleSaveId 内で処理される
+                              }
+                            }}
+                            className="flex-1 flex items-center justify-center gap-1 bg-blue-500 text-white py-2 px-3 rounded-lg hover:bg-blue-600 transition-colors"
+                          >
+                            <Check className="w-4 h-4" />
+                            <span>保存</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingId(false);
+                              setIdValue(profile?.custom_id || '');
+                              setIdError(null);
+                            }}
+                            className="flex-1 flex items-center justify-center gap-1 bg-gray-500 text-white py-2 px-3 rounded-lg hover:bg-gray-600 transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                            <span>キャンセル</span>
+                          </button>
                         </div>
                       </div>
-                    )}
-                    {/* SNSリンク */}
-                    {(profile.twitter || profile.instagram || profile.linkedin || profile.github) && (
-                      <div className="bg-white/80 rounded-xl shadow p-6 flex flex-col">
-                        <h3 className="text-lg font-bold mb-3 flex items-center gap-2">🔗 SNS</h3>
-                        <div className="flex gap-4 items-center">
-                          {profile.twitter && (
-                            <a href={`https://twitter.com/${profile.twitter.replace(/^@/,"")}`} target="_blank" rel="noopener noreferrer" className="hover:text-blue-500">
-                              <Twitter className="w-6 h-6" />
-                            </a>
-                          )}
-                          {profile.instagram && (
-                            <a href={`https://instagram.com/${profile.instagram.replace(/^@/,"")}`} target="_blank" rel="noopener noreferrer" className="hover:text-pink-500">
-                              <Instagram className="w-6 h-6" />
-                            </a>
-                          )}
-                          {profile.linkedin && (
-                            <a href={`https://linkedin.com/in/${profile.linkedin.replace(/^@/,"")}`} target="_blank" rel="noopener noreferrer" className="hover:text-blue-700">
-                              <Linkedin className="w-6 h-6" />
-                            </a>
-                          )}
-                          {profile.github && (
-                            <a href={`https://github.com/${profile.github.replace(/^@/,"")}`} target="_blank" rel="noopener noreferrer" className="hover:text-gray-800">
-                              <Github className="w-6 h-6" />
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    {/* 経歴 */}
-                    {profile.career && profile.career.length > 0 && (
-                      <div className="bg-white/80 rounded-xl shadow p-6 flex flex-col">
-                        <h3 className="text-lg font-bold mb-3 flex items-center gap-2">🏢 経歴</h3>
-                        <ul className="space-y-2">
-                          {profile.career.map((item, i) => (
-                            <li key={i} className="border-l-4 border-blue-400 pl-4">
-                              <div className="font-semibold">{item.company}</div>
-                              <div className="text-sm text-gray-600">{item.position}</div>
-                              <div className="text-xs text-gray-400">{item.period}</div>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {/* 学歴 */}
-                    {profile.education && profile.education.length > 0 && (
-                      <div className="bg-white/80 rounded-xl shadow p-6 flex flex-col">
-                        <h3 className="text-lg font-bold mb-3 flex items-center gap-2">🎓 学歴</h3>
-                        <ul className="space-y-2">
-                          {profile.education.map((item, i) => (
-                            <li key={i} className="border-l-4 border-green-400 pl-4">
-                              <div className="font-semibold">{item.school}</div>
-                              <div className="text-sm text-gray-600">{item.degree}</div>
-                              <div className="text-xs text-gray-400">{item.year}</div>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {/* ポートフォリオ */}
-                    {profile.portfolio && profile.portfolio.length > 0 && (
-                      <div className="bg-white/80 rounded-xl shadow p-6 flex flex-col md:col-span-2">
-                        <h3 className="text-lg font-bold mb-3 flex items-center gap-2">🌟 ポートフォリオ</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          {profile.portfolio.map((item, i) => (
-                            <div key={i} className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow bg-white">
-                              {item.image && (
-                                <Image
-                                  src={item.image}
-                                  alt={item.title}
-                                  width={400}
-                                  height={192}
-                                  className="w-full h-48 object-cover"
-                                />
-                              )}
-                              <div className="p-4">
-                                <div className="font-semibold text-lg mb-1">{item.title}</div>
-                                <div className="text-gray-600 text-sm mb-2">{item.description}</div>
-                                {item.url && (
-                                  <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm font-medium">
-                                    プロジェクトを見る →
-                                  </a>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  {/* ボタン群 */}
-                  <div className="flex gap-4 justify-center mt-6">
-                    <Link href="/preview" className="border-2 border-blue-600 text-blue-600 bg-white px-6 py-2 rounded-lg hover:bg-blue-50 transition-colors font-semibold">プレビュー</Link>
-                    <button
-                      onClick={() => setShowQRModal(true)}
-                      className="border-2 border-orange-500 text-orange-500 bg-white px-6 py-2 rounded-lg hover:bg-orange-50 transition-colors font-semibold"
-                    >
-                      共有
-                    </button>
-                    <Link href="/create?edit=true" className="border-2 border-gray-400 text-gray-600 bg-white px-6 py-2 rounded-lg hover:bg-gray-50 transition-colors font-semibold">編集</Link>
-                  </div>
-                </div>
-
-                {/* ブロック公開設定 */}
-                <div className="bg-white rounded-xl border border-gray-100 p-6">
-                  <h3 className="text-lg font-semibold text-black mb-4">ブロック公開設定</h3>
-                  <div className="space-y-3">
-                    {[
-                      { key: 'education', label: '学歴', value: profile.show_education },
-                      { key: 'career', label: '職歴', value: profile.show_career },
-                      { key: 'portfolio', label: 'ポートフォリオ', value: profile.show_portfolio },
-                      { key: 'skills', label: 'スキル', value: profile.show_skills },
-                      { key: 'sns', label: 'SNSリンク', value: profile.show_sns },
-                    ].map((block) => (
-                      <div key={block.key} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <span className="text-gray-700">{block.label}</span>
-                        <button
-                          onClick={() => handleToggleBlockVisibility(block.key, block.value)}
-                          className={`w-12 h-6 rounded-full transition-colors relative ${
-                            block.value ? 'bg-blue-600' : 'bg-gray-300'
-                          }`}
-                        >
-                          <div
-                            className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform ${
-                              block.value ? 'translate-x-6' : 'translate-x-0.5'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 統計情報 */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-white p-6 rounded-xl border border-gray-100">
-                    <div className="flex items-center">
-                      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
-                        <span className="text-2xl">👁️</span>
-                      </div>
-                      <div>
-                        <p className="text-gray-600 text-sm">総閲覧数</p>
-                        <p className="text-2xl font-bold text-black">{profile.views_count || 0}</p>
-                      </div>
                     </div>
-                  </div>
-                  
-                  <div className="bg-white p-6 rounded-xl border border-gray-100">
-                    <div className="flex items-center">
-                      <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mr-4">
-                        <span className="text-2xl">🌐</span>
-                      </div>
-                      <div>
-                        <p className="text-gray-600 text-sm">公開状態</p>
-                        <p className="text-lg font-bold text-black">
-                          {profile.is_public ? '公開中' : '非公開'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-white p-6 rounded-xl border border-gray-100">
-                    <div className="flex items-center">
-                      <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mr-4">
-                        <span className="text-2xl">📅</span>
-                      </div>
-                      <div>
-                        <p className="text-gray-600 text-sm">作成日</p>
-                        <p className="text-sm font-medium text-black">
-                          {new Date(profile.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+                  )}
                 </div>
-              </div>
-            )}
-          </div>
-        </>
-      )}
-
-      {/* QRコードモーダル */}
-      {showQRModal && profile && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-black mb-4">共有・QRコード</h2>
-              <p className="text-gray-600 mb-6">{profile.nickname || profile.name}</p>
-              <div className="w-48 h-48 mx-auto bg-gray-100 rounded-lg flex items-center justify-center mb-6">
-                {profile.profile_url ? (
-                  <QRCodeCanvas value={profile.profile_url} size={180} />
-                ) : (
-                  <div className="text-center">
-                    <div className="text-4xl mb-2">📱</div>
-                    <p className="text-sm text-gray-500">QRコード</p>
-                    <p className="text-xs text-gray-400 mt-1">URL未設定</p>
-                  </div>
-                )}
-              </div>
-              <p className="text-sm text-gray-600 mb-4">
-                このQRコードまたはURLをシェアできます
-              </p>
-              <div className="space-y-3">
-                <button
-                  onClick={() => copyToClipboard(profile.profile_url)}
-                  className="w-full border-2 border-blue-600 text-blue-600 bg-white py-2 rounded-lg hover:bg-blue-50 font-semibold"
-                >
-                  URLをコピー
-                </button>
-                <div className="w-full break-all text-xs text-gray-500 bg-gray-50 rounded p-2 mb-2">{profile.profile_url}</div>
-                <button
-                  onClick={() => setShowQRModal(false)}
-                  className="w-full border-2 border-gray-400 text-gray-600 bg-white py-2 rounded-lg hover:bg-gray-50 font-semibold"
-                >
-                  閉じる
-                </button>
-              </div>
+              )}
             </div>
           </div>
+
+          {/* Right Column */}
+          <div className="lg:col-span-2">
+            <Section title="自己紹介" icon={<User size={24} />} editHref="/create?edit=true&section=bio">
+              {profile?.bio ? (
+                <p className="text-base text-gray-700 whitespace-pre-line leading-relaxed bg-white/60 p-6 rounded-xl border border-gray-200/80">
+                  {profile.bio}
+                </p>
+              ) : (
+                <div className="text-center py-10 bg-white/60 rounded-xl border border-dashed border-gray-300">
+                    <p className="text-gray-500">自己紹介がまだありません。</p>
+                    <Link href="/create?edit=true&section=bio" className="mt-2 text-blue-600 hover:underline font-medium">追加する</Link>
+                </div>
+              )}
+            </Section>
+
+            <Section title="SNS" icon={<FaLink size={20} />} isPublic={profile?.show_sns} onToggleVisibility={() => handleToggleBlockVisibility('sns')} editHref="/create?edit=true&section=sns">
+                <div className="bg-white/60 p-6 rounded-xl border border-gray-200/80">
+                  <SNSLinks {...profile} />
+                </div>
+            </Section>
+
+            <Section title="スキル" icon={<FaLightbulb size={24} />} isPublic={profile?.show_skills} onToggleVisibility={() => handleToggleBlockVisibility('skills')} editHref="/create?edit=true&section=skills">
+                <div className="flex flex-wrap gap-3 bg-white/60 p-6 rounded-xl border border-gray-200/80 min-h-[80px] items-center">
+                  {profile?.skills && profile.skills.length > 0 ? profile.skills.map((skill: string, i: number) => (
+                    <span key={i} className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full text-sm font-semibold shadow-sm">{skill}</span>
+                  )) : <p className="text-gray-500 text-sm">スキルがまだ登録されていません。</p>}
+                </div>
+            </Section>
+
+            <Section title="学歴" icon={<FaGraduationCap size={24} />} isPublic={profile?.show_education} onToggleVisibility={() => handleToggleBlockVisibility('education')} editHref="/create?edit=true&section=education">
+                <div className="space-y-4">
+                  {profile?.education && profile.education.length > 0 ? profile.education.map((edu, i) => (
+                     <div key={i} className="bg-white/60 p-6 rounded-xl border border-gray-200/80">
+                        <p className="font-bold text-lg text-gray-800">{edu.school}</p>
+                        <p className="text-gray-600">{edu.degree}</p>
+                        <p className="text-sm text-gray-500 mt-1">{edu.year}</p>
+                    </div>
+                  )) : <p className="text-gray-500 text-sm pl-2">学歴がまだ登録されていません。</p>}
+                </div>
+            </Section>
+
+            <Section title="経歴" icon={<Briefcase size={24} />} isPublic={profile?.show_career} onToggleVisibility={() => handleToggleBlockVisibility('career')} editHref="/create?edit=true&section=career">
+                <div className="space-y-4">
+                  {profile?.career && profile.career.length > 0 ? profile.career.map((car, i) => (
+                    <div key={i} className="bg-white/60 p-6 rounded-xl border border-gray-200/80">
+                      <p className="font-bold text-lg text-gray-800">{car.company}</p>
+                      <p className="text-gray-600">{car.position}</p>
+                      <p className="text-sm text-gray-500 mt-1">{car.period}</p>
+                    </div>
+                  )) : <p className="text-gray-500 text-sm pl-2">経歴がまだ登録されていません。</p>}
+                </div>
+            </Section>
+
+            <Section title="ポートフォリオ" icon={<FaGlobe size={24} />} isPublic={profile?.show_portfolio} onToggleVisibility={() => handleToggleBlockVisibility('portfolio')} editHref="/create?edit=true&section=portfolio">
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-h-[120px]">
+                    {profile?.portfolio && profile.portfolio.length > 0 ? profile.portfolio.map((port, i) => (
+                        <a href={port.url || undefined} key={i} target="_blank" rel="noopener noreferrer" className="block bg-white/60 rounded-xl border border-gray-200/80 overflow-hidden group transition-all transform hover:-translate-y-1 hover:shadow-lg">
+                          {port.image && <Image src={port.image} alt={port.title} width={400} height={250} className="w-full h-40 object-cover" />}
+                          <div className="p-4">
+                            <h4 className="font-bold text-gray-800">{port.title}</h4>
+                            <p className="text-sm text-gray-600 mt-1">{port.description}</p>
+                          </div>
+                        </a>
+                    )) : <p className="text-gray-500 text-sm pl-2">ポートフォリオがまだ登録されていません。</p>}
+                </div>
+            </Section>
+
+          </div>
+        </div>
+      </main>
+      
+      {showQRModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center" onClick={() => setShowQRModal(false)}>
+            <div className="bg-white p-8 rounded-2xl shadow-xl text-center" onClick={(e) => e.stopPropagation()}>
+                <h3 className="text-xl font-bold mb-4">マイページのQRコード</h3>
+                {publicProfileUrl && <QRCodeCanvas value={publicProfileUrl} size={256} />}
+                <p className="text-sm text-gray-600 mt-4 max-w-xs">{publicProfileUrl}</p>
+                <button onClick={() => setShowQRModal(false)} className="mt-6 bg-gray-200 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors">閉じる</button>
+            </div>
         </div>
       )}
     </div>

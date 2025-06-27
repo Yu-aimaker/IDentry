@@ -1,15 +1,18 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, ReactElement } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
-import { getFormDataLocally, getProfileImageUrl, Profile } from '../../../lib/supabase';
+import { getProfileByCustomId, getProfileImageUrl, Profile, getUserProfile, getFormDataLocally } from '../../../lib/supabase';
 import { useAuth } from '../../../lib/auth-context';
 import { IDCardProfile } from "../../../components/ui/IDCardProfile";
-import { Github, Twitter, Instagram, Linkedin } from "lucide-react";
+import { motion } from "framer-motion";
+import { FaTwitter, FaGithub, FaInstagram, FaLinkedin, FaGlobe, FaLink, FaGraduationCap, FaLightbulb } from 'react-icons/fa';
+import { Briefcase, User, ExternalLink, FileQuestion } from 'lucide-react';
 
-interface ProfileData {
+// ローカルストレージベースのプロフィールデータ型
+interface LocalProfileData {
   name: string;
   photo: string;
   bio: string;
@@ -35,78 +38,167 @@ interface ProfileData {
     url: string;
     image: string;
   }>;
-  department?: string;
-  employee_id?: string;
-  created_at?: string;
-  address?: string;
+}
+
+function Section({ title, icon, children }: { title: string, icon: ReactElement, children: React.ReactNode }) {
+  return (
+    <motion.section 
+      className="mb-12"
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      viewport={{ once: true, amount: 0.3 }}
+    >
+      <div className="flex items-center mb-6">
+        <div className="text-gray-500 bg-white/80 backdrop-blur-sm rounded-full p-3 mr-4 border border-gray-200/80 shadow-sm">
+          {icon}
+        </div>
+        <h2 className="text-2xl font-bold text-gray-800 tracking-wider">{title}</h2>
+      </div>
+      <div className="pl-4">{children}</div>
+    </motion.section>
+  );
+}
+
+function SNSLinks({ twitter, instagram, linkedin, github }: { twitter?: string, instagram?: string, linkedin?: string, github?: string }) {
+  const sns = [
+    { href: twitter ? `https://twitter.com/${twitter.replace(/^@/, "")}` : '', icon: <FaTwitter size={24} />, label: 'Twitter', show: !!twitter },
+    { href: instagram ? `https://instagram.com/${instagram.replace(/^@/, "")}` : '', icon: <FaInstagram size={24} />, label: 'Instagram', show: !!instagram },
+    { href: linkedin ? `https://linkedin.com/in/${linkedin.replace(/^@/, "")}` : '', icon: <FaLinkedin size={24} />, label: 'LinkedIn', show: !!linkedin },
+    { href: github ? `https://github.com/${github.replace(/^@/, "")}` : '', icon: <FaGithub size={24} />, label: 'GitHub', show: !!github },
+  ];
+
+  return (
+    <div className="flex flex-wrap gap-4 items-center">
+      {sns.map((item, index) => item.show && (
+        <a 
+          key={index}
+          href={item.href} 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="text-gray-500 hover:text-blue-500 transition-colors duration-300 transform hover:scale-110"
+          aria-label={item.label}
+        >
+          {item.icon}
+        </a>
+      ))}
+      {!sns.some(s => s.show) && (
+        <p className="text-gray-500 text-sm">SNSアカウントがまだリンクされていません。</p>
+      )}
+    </div>
+  );
 }
 
 function PreviewPageContent() {
-  const [profileData, setProfileData] = useState<ProfileData | null>(null);
-  const router = useRouter();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [localProfile, setLocalProfile] = useState<LocalProfileData | null>(null);
+  const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
   const { user } = useAuth();
+  const router = useRouter();
+  
+  const customId = searchParams.get('id');
   const isFromEdit = searchParams.get('from') === 'edit';
-  const [cardVariant] = useState<'pasmo' | 'credit' | 'corporate' | 'metro'>(() => {
-    if (typeof window !== 'undefined') {
-      const v = localStorage.getItem('card_variant');
-      if (v === 'pasmo' || v === 'credit' || v === 'corporate' || v === 'metro') return v;
-    }
-    return 'pasmo';
-  });
 
   useEffect(() => {
-    // ローカルストレージからフォームデータを取得
-    const savedData = getFormDataLocally();
-    if (savedData) {
-      const profileData: ProfileData = {
-        name: savedData.name || '名前未設定',
-        photo: savedData.photo || '',
-        bio: savedData.bio || '',
-        twitter: savedData.twitter || '',
-        instagram: savedData.instagram || '',
-        linkedin: savedData.linkedin || '',
-        github: savedData.github || '',
-        skills: savedData.skills || [],
-        education: savedData.education || [],
-        career: savedData.career || [],
-        portfolio: savedData.portfolio || [],
-        department: savedData.department || '',
-        employee_id: savedData.employee_id || '',
-        created_at: savedData.created_at || '',
-        address: savedData.address || ''
-      };
-      setProfileData(profileData);
-    } else {
-      // フォームデータがない場合はデフォルトデータ
-      const defaultData: ProfileData = {
-        name: 'サンプル太郎',
-        photo: '',
-        bio: 'まだ自己紹介が入力されていません。',
-        twitter: '',
-        instagram: '',
-        linkedin: '',
-        github: '',
-        skills: [],
-        education: [],
-        career: [],
-        portfolio: [],
-        department: '',
-        employee_id: '',
-        created_at: '',
-        address: ''
-      };
-      setProfileData(defaultData);
-    }
-  }, []);
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        // 1. IDが指定されている場合はDBからプロフィールを取得
+        if (customId) {
+          const userProfile = await getProfileByCustomId(customId);
+          if (userProfile) {
+            setProfile(userProfile);
+            setLocalProfile(null);
+          } else {
+            setProfile(null);
+            setLocalProfile(null);
+          }
+        }
+        // 2. ログインユーザーで、IDが指定されていない場合はユーザーのプロフィールを取得
+        else if (user) {
+          const userProfile = await getUserProfile();
+          if (userProfile) {
+            setProfile(userProfile);
+            setLocalProfile(null);
+          } else {
+            // プロフィールがない場合はローカルストレージから取得
+            const savedData = getFormDataLocally();
+            if (savedData) {
+              setLocalProfile({
+                name: savedData.name || 'サンプル太郎',
+                photo: savedData.photo || '',
+                bio: savedData.bio || '',
+                twitter: savedData.twitter || '',
+                instagram: savedData.instagram || '',
+                linkedin: savedData.linkedin || '',
+                github: savedData.github || '',
+                skills: savedData.skills || [],
+                google_avatar_url: savedData.google_avatar_url || '',
+                education: savedData.education || [],
+                career: savedData.career || [],
+                portfolio: savedData.portfolio || []
+              });
+            }
+            setProfile(null);
+          }
+        }
+        // 3. 未ログインの場合はローカルストレージから取得
+        else {
+          const savedData = getFormDataLocally();
+          if (savedData) {
+            setLocalProfile({
+              name: savedData.name || 'サンプル太郎',
+              photo: savedData.photo || '',
+              bio: savedData.bio || '',
+              twitter: savedData.twitter || '',
+              instagram: savedData.instagram || '',
+              linkedin: savedData.linkedin || '',
+              github: savedData.github || '',
+              skills: savedData.skills || [],
+              google_avatar_url: savedData.google_avatar_url || '',
+              education: savedData.education || [],
+              career: savedData.career || [],
+              portfolio: savedData.portfolio || []
+            });
+          } else {
+            // デフォルトデータを設定
+            setLocalProfile({
+              name: 'サンプル太郎',
+              photo: '',
+              bio: 'まだ自己紹介が入力されていません。',
+              twitter: '',
+              instagram: '',
+              linkedin: '',
+              github: '',
+              skills: [],
+              education: [],
+              career: [],
+              portfolio: []
+            });
+          }
+          setProfile(null);
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        setProfile(null);
+        setLocalProfile(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [customId, user]);
+
+  const cardVariant = typeof window !== 'undefined' ? (localStorage.getItem('card_variant') as 'pasmo' | 'credit' | 'corporate' | 'metro' || 'pasmo') : 'pasmo';
 
   const handlePublish = () => {
-    // プロフィールを公開する場合は、新規登録ページに遷移してデータベースに保存
     alert('プロフィールを公開するには新規登録が必要です。入力されたデータは保持されます。');
     router.push('/login?mode=signup');
   };
 
-  if (!profileData) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
@@ -117,215 +209,258 @@ function PreviewPageContent() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* ヘッダー */}
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center">
-            <Image
-              src="/img/banner.png"
-              alt="IDentry Banner"
-              width={160}
-              height={64}
-              className="h-10 object-contain cursor-pointer hover:opacity-80 transition-opacity duration-200"
-            />
+  // IDが指定されたがプロフィールが見つからない場合（404）
+  if (customId && !profile) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, y: -20, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-gray-200/80 p-8 text-center"
+        >
+          <div className="mx-auto mb-6 flex items-center justify-center w-24 h-24 bg-blue-100 rounded-full">
+            <FileQuestion className="w-12 h-12 text-blue-500" />
+          </div>
+
+          <h1 className="text-3xl font-bold text-gray-800 mb-3">
+            お探しのページは見つかりませんでした
+          </h1>
+          <p className="text-gray-600 mb-8 max-w-sm mx-auto">
+            ご指定のIDのプロフィールは存在しないか、持ち主によって非公開に設定されているようです。
+          </p>
+          <Link
+            href="/"
+            className="inline-block bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 px-8 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+          >
+            ホームに戻る
           </Link>
-          <div className="flex items-center space-x-4">
-            {user && isFromEdit ? (
-              <Link
-                href="/create?edit=true"
-                className="text-gray-600 hover:text-black transition-colors"
-              >
-                ← 編集に戻る
+        </motion.div>
+      </div>
+    );
+  }
+
+  // データが全くない場合は何も表示しない（通常起こらない）
+  if (!profile && !localProfile) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <p className="text-gray-600">データが見つかりません。</p>
+      </div>
+    );
+  }
+
+  // プロフィールデータの準備（DBプロフィールまたはローカルプロフィール）
+  const isLocalPreview = !profile && !!localProfile;
+
+  return (
+    <div className="bg-gray-50/50 font-sans">
+      {/* ヘッダー */}
+      <header className="bg-white/80 backdrop-blur-lg border-b border-gray-100 sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 flex justify-center">
+              <Link href="/">
+                <Image
+                  src="/img/banner.png"
+                  alt="IDentry Banner"
+                  width={320}
+                  height={60}
+                  className="h-12 w-auto object-contain mx-auto cursor-pointer hover:opacity-80 transition-opacity"
+                />
               </Link>
-            ) : (
-              <Link
-                href="/create"
-                className="text-gray-600 hover:text-black transition-colors"
-              >
-                ← 編集に戻る
-              </Link>
-            )}
-            {!user && (
-              <button
-                onClick={handlePublish}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                公開する
-              </button>
-            )}
-            {user && (
-              <Link
-                href="/dashboard"
-                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
-              >
-                マイページに戻る
-              </Link>
-            )}
+            </div>
+            <div className="flex items-center space-x-4 absolute right-4 top-1/2 -translate-y-1/2">
+              {user && isFromEdit ? (
+                <Link
+                  href="/create?edit=true"
+                  className="text-gray-600 hover:text-black transition-colors text-sm font-medium"
+                >
+                  ← 編集に戻る
+                </Link>
+              ) : isLocalPreview ? (
+                <Link
+                  href="/create"
+                  className="text-gray-600 hover:text-black transition-colors text-sm font-medium"
+                >
+                  ← 編集に戻る
+                </Link>
+              ) : null}
+              
+              {isLocalPreview && !user && (
+                <button
+                  onClick={handlePublish}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                >
+                  公開する
+                </button>
+              )}
+              
+              {user && profile && user.id === profile.user_id ? (
+                <Link
+                  href="/dashboard"
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                >
+                  マイページに戻る
+                </Link>
+              ) : !user && !isLocalPreview && (
+                <Link
+                  href="/login"
+                  className="text-gray-600 hover:text-black transition-colors text-sm font-medium"
+                >
+                  ログイン
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       </header>
 
       {/* プレビュー通知 */}
-      <div className="bg-blue-50 border-b border-blue-100">
-        <div className="max-w-4xl mx-auto px-4 py-3 text-center">
-          <p className="text-blue-800">
-            <span className="font-medium">👀 プレビューモード</span> - 
-            これはあなたのプロフィールがどのように表示されるかのプレビューです
-          </p>
+      {isLocalPreview && (
+        <div className="bg-blue-50 border-b border-blue-100">
+          <div className="max-w-4xl mx-auto px-4 py-3 text-center">
+            <p className="text-blue-800">
+              <span className="font-medium">👀 プレビューモード</span> - 
+              これはあなたのプロフィールがどのように表示されるかのプレビューです
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* メインコンテンツ */}
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          {/* ヘッダー部分をIDカードに置き換え */}
-          <div className="flex flex-col md:flex-row items-center md:items-start gap-8">
-            <div className="w-full max-w-2xl">
-              <IDCardProfile
-                profileData={{
-                  name: profileData.name,
-                  title: profileData.bio || "",
-                  department: profileData.department || "",
-                  employeeId: profileData.employee_id || "",
-                  joinDate: profileData.created_at ? new Date(profileData.created_at).toLocaleDateString() : "",
-                  email: user?.email || "",
-                  avatar: getProfileImageUrl({
-                    ...profileData,
-                    id: '',
-                    user_id: '',
-                    is_public: true,
-                    views_count: 0,
-                    profile_url: '',
-                    created_at: '',
-                    updated_at: '',
-                    show_education: true,
-                    show_career: true,
-                    show_portfolio: true,
-                    show_skills: true,
-                    show_sns: true,
-                    skills: profileData.skills || [],
-                  } as Profile) || undefined,
-                }}
-                variant={cardVariant}
-              />
-            </div>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+          {/* Left Column (Sticky) */}
+          <div className="lg:col-span-1 lg:sticky top-28 h-full">
+            <IDCardProfile
+              profileData={{
+                name: (profile?.nickname || profile?.name || localProfile?.name) || "",
+                title: (profile?.bio || localProfile?.bio || '').split('\n')[0] || "",
+                department: "",
+                employeeId: profile?.custom_id || "",
+                joinDate: profile?.created_at ? new Date(profile.created_at).toLocaleDateString('ja-JP') : "",
+                email: user?.email || "",
+                avatar: profile ? getProfileImageUrl(profile) || undefined : (localProfile?.photo || localProfile?.google_avatar_url || undefined),
+              }}
+              variant={cardVariant}
+            />
           </div>
 
-          {/* 新・詳細セクション */}
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* スキル */}
-            {profileData.skills.length > 0 && (
-              <div className="bg-white/80 rounded-xl shadow p-6 flex flex-col">
-                <h3 className="text-lg font-bold mb-3 flex items-center gap-2">💡 スキル</h3>
-                <div className="flex flex-wrap gap-2">
-                  {profileData.skills.map((skill, i) => (
-                    <span key={i} className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+          {/* Right Column (Scrollable) */}
+          <div className="lg:col-span-2">
+            {/* 自己紹介 */}
+            {(profile?.bio || localProfile?.bio) && (
+              <Section title="自己紹介" icon={<User size={24} />}>
+                <p className="text-base text-gray-700 whitespace-pre-line leading-relaxed bg-white/60 p-6 rounded-xl border border-gray-200/80">
+                  {profile?.bio || localProfile?.bio}
+                </p>
+              </Section>
+            )}
+
+            {/* SNS欄 */}
+            {((!profile || profile.show_sns) && 
+              ((profile?.twitter || profile?.instagram || profile?.linkedin || profile?.github) || 
+               (localProfile?.twitter || localProfile?.instagram || localProfile?.linkedin || localProfile?.github))) && (
+              <Section title="SNS" icon={<FaLink size={20} />}>
+                <div className="bg-white/60 p-6 rounded-xl border border-gray-200/80">
+                  <SNSLinks 
+                    twitter={profile?.twitter || localProfile?.twitter}
+                    instagram={profile?.instagram || localProfile?.instagram}
+                    linkedin={profile?.linkedin || localProfile?.linkedin}
+                    github={profile?.github || localProfile?.github}
+                  />
+                </div>
+              </Section>
+            )}
+
+            {/* スキル欄 */}
+            {((!profile || profile.show_skills) && 
+              ((profile?.skills && profile.skills.length > 0) || 
+               (localProfile?.skills && localProfile.skills.length > 0))) && (
+              <Section title="スキル" icon={<FaLightbulb size={24} />}>
+                <div className="flex flex-wrap gap-3 bg-white/60 p-6 rounded-xl border border-gray-200/80">
+                  {(profile?.skills || localProfile?.skills || []).map((skill: string, i: number) => (
+                    <span key={i} className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full text-sm font-semibold shadow-sm">
                       {skill}
                     </span>
                   ))}
                 </div>
-              </div>
+              </Section>
             )}
-            {/* SNSリンク */}
-            {(profileData.twitter || profileData.instagram || profileData.linkedin || profileData.github) && (
-              <div className="bg-white/80 rounded-xl shadow p-6 flex flex-col">
-                <h3 className="text-lg font-bold mb-3 flex items-center gap-2">🔗 SNS</h3>
-                <div className="flex gap-4 items-center">
-                  {profileData.twitter && (
-                    <a href={`https://twitter.com/${profileData.twitter.replace(/^@/,"")}`} target="_blank" rel="noopener noreferrer" className="hover:text-blue-500">
-                      <Twitter className="w-6 h-6" />
-                    </a>
-                  )}
-                  {profileData.instagram && (
-                    <a href={`https://instagram.com/${profileData.instagram.replace(/^@/,"")}`} target="_blank" rel="noopener noreferrer" className="hover:text-pink-500">
-                      <Instagram className="w-6 h-6" />
-                    </a>
-                  )}
-                  {profileData.linkedin && (
-                    <a href={`https://linkedin.com/in/${profileData.linkedin.replace(/^@/,"")}`} target="_blank" rel="noopener noreferrer" className="hover:text-blue-700">
-                      <Linkedin className="w-6 h-6" />
-                    </a>
-                  )}
-                  {profileData.github && (
-                    <a href={`https://github.com/${profileData.github.replace(/^@/,"")}`} target="_blank" rel="noopener noreferrer" className="hover:text-gray-800">
-                      <Github className="w-6 h-6" />
-                    </a>
-                  )}
-                </div>
-              </div>
-            )}
-            {/* 経歴 */}
-            {profileData.career.length > 0 && (
-              <div className="bg-white/80 rounded-xl shadow p-6 flex flex-col">
-                <h3 className="text-lg font-bold mb-3 flex items-center gap-2">🏢 経歴</h3>
-                <ul className="space-y-2">
-                  {profileData.career.map((item, i) => (
-                    <li key={i} className="border-l-4 border-blue-400 pl-4">
-                      <div className="font-semibold">{item.company}</div>
-                      <div className="text-sm text-gray-600">{item.position}</div>
-                      <div className="text-xs text-gray-400">{item.period}</div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {/* 学歴 */}
-            {profileData.education.length > 0 && (
-              <div className="bg-white/80 rounded-xl shadow p-6 flex flex-col">
-                <h3 className="text-lg font-bold mb-3 flex items-center gap-2">🎓 学歴</h3>
-                <ul className="space-y-2">
-                  {profileData.education.map((item, i) => (
-                    <li key={i} className="border-l-4 border-green-400 pl-4">
-                      <div className="font-semibold">{item.school}</div>
-                      <div className="text-sm text-gray-600">{item.degree}</div>
-                      <div className="text-xs text-gray-400">{item.year}</div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {/* ポートフォリオ */}
-            {profileData.portfolio.length > 0 && (
-              <div className="bg-white/80 rounded-xl shadow p-6 flex flex-col md:col-span-2">
-                <h3 className="text-lg font-bold mb-3 flex items-center gap-2">🌟 ポートフォリオ</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {profileData.portfolio.map((item, i) => (
-                    <div key={i} className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow bg-white">
-                      {item.image && (
-                        <Image
-                          src={item.image}
-                          alt={item.title}
-                          width={400}
-                          height={192}
-                          className="w-full h-48 object-cover"
-                        />
-                      )}
-                      <div className="p-4">
-                        <div className="font-semibold text-lg mb-1">{item.title}</div>
-                        <div className="text-gray-600 text-sm mb-2">{item.description}</div>
-                        {item.url && (
-                          <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm font-medium">
-                            プロジェクトを見る →
-                          </a>
-                        )}
-                      </div>
+
+            {/* 学歴欄 */}
+            {((!profile || profile.show_education) && 
+              ((profile?.education && profile.education.length > 0) || 
+               (localProfile?.education && localProfile.education.length > 0))) && (
+              <Section title="学歴" icon={<FaGraduationCap size={24} />}>
+                <div className="space-y-4">
+                  {(profile?.education || localProfile?.education || []).map((edu, i) => (
+                     <div key={i} className="bg-white/60 p-6 rounded-xl border border-gray-200/80 transition-shadow hover:shadow-md">
+                        <p className="font-bold text-lg text-gray-800">{edu.school}</p>
+                        <p className="text-gray-600">{edu.degree}</p>
+                        <p className="text-sm text-gray-500 mt-1">{edu.year}</p>
                     </div>
                   ))}
                 </div>
-              </div>
+              </Section>
+            )}
+
+            {/* 経歴欄 */}
+            {((!profile || profile.show_career) && 
+              ((profile?.career && profile.career.length > 0) || 
+               (localProfile?.career && localProfile.career.length > 0))) && (
+              <Section title="経歴" icon={<Briefcase size={24} />}>
+                <div className="space-y-4">
+                  {(profile?.career || localProfile?.career || []).map((car, i) => (
+                    <div key={i} className="bg-white/60 p-6 rounded-xl border border-gray-200/80 transition-shadow hover:shadow-md">
+                      <p className="font-bold text-lg text-gray-800">{car.company}</p>
+                      <p className="text-gray-600">{car.position}</p>
+                      <p className="text-sm text-gray-500 mt-1">{car.period}</p>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+            )}
+
+            {/* ポートフォリオ欄 */}
+            {((!profile || profile.show_portfolio) && 
+              ((profile?.portfolio && profile.portfolio.length > 0) || 
+               (localProfile?.portfolio && localProfile.portfolio.length > 0))) && (
+              <Section title="ポートフォリオ" icon={<FaGlobe size={24} />}>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {(profile?.portfolio || localProfile?.portfolio || []).map((port, i) => (
+                        <a 
+                          href={port.url || undefined} 
+                          key={i} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="block bg-white/60 rounded-xl border border-gray-200/80 overflow-hidden group transition-all transform hover:-translate-y-1 hover:shadow-lg"
+                        >
+                          {port.image && <Image src={port.image} alt={port.title} width={400} height={250} className="w-full h-40 object-cover" />}
+                          <div className="p-4">
+                            <h4 className="font-bold text-gray-800 group-hover:text-blue-600 transition-colors">{port.title}</h4>
+                            <p className="text-sm text-gray-600 mt-1">{port.description}</p>
+                            {port.url && (
+                              <div className="flex items-center mt-2 text-xs text-blue-500">
+                                  <ExternalLink className="w-3 h-3 mr-1" />
+                                  <span>{port.url.replace(/https?:\/\//, '')}</span>
+                              </div>
+                            )}
+                          </div>
+                        </a>
+                    ))}
+                </div>
+              </Section>
             )}
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
 
 export default function PreviewPage() {
   return (
-    <Suspense fallback={<div>読み込み中...</div>}>
+    <Suspense fallback={<div className="min-h-screen bg-white flex items-center justify-center"><div className="text-center"><div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div><p className="text-gray-600">読み込み中...</p></div></div>}>
       <PreviewPageContent />
     </Suspense>
   );

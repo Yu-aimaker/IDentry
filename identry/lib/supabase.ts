@@ -46,6 +46,7 @@ export interface Profile {
   education?: Education[]
   career?: Career[]
   portfolio?: Portfolio[]
+  custom_id?: string | null
 }
 
 export interface Education {
@@ -84,14 +85,8 @@ export const getCurrentUser = async () => {
 
 // GoogleアカウントのアバターURLを取得する関数
 export const getGoogleAvatarUrl = async () => {
-  const user = await getCurrentUser()
-  if (!user) return null
-  
-  // Googleプロバイダーの場合のみアバターURLを取得
-  if (user.app_metadata?.provider === 'google') {
-    return user.user_metadata?.avatar_url || null
-  }
-  return null
+  const { data } = await supabase.auth.getSession()
+  return data.session?.user.user_metadata.avatar_url || null
 }
 
 // プロフィール画像のURLを取得（優先順位: photo -> google_avatar_url -> null）
@@ -132,8 +127,11 @@ export const createProfile = async (profileData: {
   const user = await getCurrentUser()
   if (!user) throw new Error('認証が必要です')
 
-  // GoogleアカウントのアバターURLを取得
-  const googleAvatarUrl = await getGoogleAvatarUrl()
+  // GoogleアカウントのアバターURLを取得（プロフィール画像がない場合のみ）
+  let googleAvatarUrl = null;
+  if (!profileData.photo) {
+    googleAvatarUrl = await getGoogleAvatarUrl();
+  }
 
   const { data, error } = await supabase
     .from('profiles')
@@ -177,7 +175,7 @@ export const getProfile = async (profileId?: string) => {
 
 // ユーザーのプロフィール取得（1つのみ）
 export const getUserProfile = async () => {
-  const user = await getCurrentUser()
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null;
 
   const { data, error } = await supabase
@@ -283,11 +281,9 @@ export const saveFormDataLocally = (formData: Record<string, unknown>) => {
 }
 
 export const getFormDataLocally = () => {
-  if (typeof window !== 'undefined') {
-    const data = localStorage.getItem('identry_form_data')
-    return data ? JSON.parse(data) : null
-  }
-  return null
+  if (typeof window === 'undefined') return null;
+  const savedData = localStorage.getItem('identry_form_data');
+  return savedData ? JSON.parse(savedData) : null;
 }
 
 export const clearFormDataLocally = () => {
@@ -297,42 +293,32 @@ export const clearFormDataLocally = () => {
 }
 
 // プロフィール更新
-export const updateProfile = async (profileData: Partial<Profile>) => {
-  const user = await getCurrentUser()
-  if (!user) throw new Error('認証が必要です')
-
-  // Googleアバター情報を取得して含める
-  const googleAvatarUrl = await getGoogleAvatarUrl()
-  const updateData = {
-    ...profileData,
-    google_avatar_url: googleAvatarUrl || profileData.google_avatar_url
-  }
+export const updateProfile = async (updates: Partial<Profile>) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("User not found");
 
   const { data, error } = await supabase
-    .from('profiles')
-    .update(updateData)
-    .eq('user_id', user.id)
+    .from("profiles")
+    .update(updates)
+    .eq("user_id", user.id)
     .select()
-    .single()
+    .single();
 
-  if (error) throw error
-  return data
+  if (error) {
+    console.error("Error updating profile:", error);
+    throw error;
+  }
+  return data;
 }
 
 // ブロック公開設定更新
-export const updateBlockVisibility = async (blockSettings: {
-  show_education?: boolean
-  show_career?: boolean
-  show_portfolio?: boolean
-  show_skills?: boolean
-  show_sns?: boolean
-}) => {
-  const user = await getCurrentUser()
-  if (!user) throw new Error('認証が必要です')
+export const updateBlockVisibility = async (updates: Partial<Profile>) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("User not found");
 
   const { data, error } = await supabase
     .from('profiles')
-    .update(blockSettings)
+    .update(updates)
     .eq('user_id', user.id)
     .select()
     .single()
@@ -444,8 +430,11 @@ export const updateFullProfile = async (profileData: {
     // プロフィール情報を更新
     const { education, career, portfolio, ...mainProfileData } = profileData
     
-    // Googleアバター情報を取得
-    const googleAvatarUrl = await getGoogleAvatarUrl()
+    // Googleアバター情報を取得（ローカルデータに写真がない場合のみ）
+    let finalGoogleAvatarUrl = mainProfileData.google_avatar_url;
+    if (!mainProfileData.photo && !mainProfileData.google_avatar_url) {
+      finalGoogleAvatarUrl = await getGoogleAvatarUrl();
+    }
     
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
@@ -453,7 +442,7 @@ export const updateFullProfile = async (profileData: {
         user_id: user.id,
         ...mainProfileData,
         skills: mainProfileData.skills || [],
-        google_avatar_url: googleAvatarUrl || mainProfileData.google_avatar_url
+        google_avatar_url: finalGoogleAvatarUrl
       }, { onConflict: 'user_id' })
       .select()
       .single()
@@ -558,4 +547,29 @@ export const updateFullProfile = async (profileData: {
       throw new Error(`プロフィール更新中に予期しないエラーが発生しました: ${String(error)}`)
     }
   }
+}
+
+export const getProfileByCustomId = async (customId: string): Promise<Profile | null> => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select(`
+      *,
+      education (*),
+      career (*),
+      portfolio (*)
+    `)
+    .eq('custom_id', customId)
+    .eq('is_public', true)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') { // PostgREST error for "queried row does not exist"
+      console.log(`No public profile found for custom_id: ${customId}`);
+      return null;
+    }
+    console.error('Error fetching profile by custom ID:', error);
+    throw error;
+  }
+
+  return data as Profile;
 } 
