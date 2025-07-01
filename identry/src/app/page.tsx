@@ -15,7 +15,7 @@ export default function Home() {
     if (!loading && user) {
       router.replace('/dashboard');
     }
-  }, [user, loading]);
+  }, [user, loading, router]);
 
   return (
     <div className="min-h-screen bg-white">
@@ -307,15 +307,15 @@ export default function Home() {
             </div>
             
             <div className="flex items-center space-x-8 text-sm text-gray-600">
-              <a href="#" className="hover:text-blue-600 transition-colors">プライバシーポリシー</a>
-              <a href="#" className="hover:text-blue-600 transition-colors">利用規約</a>
-              <a href="#" className="hover:text-blue-600 transition-colors">運営情報</a>
+              <Link href="/privacy" className="hover:text-blue-600 transition-colors">プライバシーポリシー</Link>
+              <Link href="/terms" className="hover:text-blue-600 transition-colors">利用規約</Link>
+              <a href="https://groovibes.studio" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors">運営情報</a>
             </div>
           </div>
           
           <div className="border-t border-gray-100 mt-8 pt-8 text-center">
             <p className="text-gray-500 text-sm">
-              © 2024 IDentry. All rights reserved.
+              © 2025 IDentry. All rights reserved.
             </p>
           </div>
         </div>

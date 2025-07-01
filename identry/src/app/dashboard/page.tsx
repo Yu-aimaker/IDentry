@@ -8,8 +8,8 @@ import { useAuth } from '../../../lib/auth-context';
 import { getUserProfile, updateBlockVisibility, Profile, getProfileImageUrl, uploadProfileImage, updateProfile, updateProfileVisibility, getFormDataLocally, clearFormDataLocally, updateFullProfile } from '../../../lib/supabase';
 import { IDCardProfile } from "../../../components/ui/IDCardProfile";
 import { motion } from "framer-motion";
-import { FaTwitter, FaGithub, FaInstagram, FaLinkedin, FaGlobe, FaLink, FaGraduationCap, FaLightbulb } from 'react-icons/fa';
-import { Briefcase, User, QrCode, LogOut, Edit, Eye, Check, X, Settings } from 'lucide-react';
+import { FaTwitter, FaGithub, FaInstagram, FaLinkedin, FaGlobe, FaLink, FaGraduationCap, FaLightbulb, FaFacebook, FaLine } from 'react-icons/fa';
+import { Briefcase, User, QrCode, LogOut, Edit, Eye, Check, X, Settings, Share, Copy } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 
 // Reusable Switch component
@@ -81,9 +81,11 @@ export default function MyPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [showQRModal, setShowQRModal] = useState(false);
+  const [showShareMenu, setShowShareMenu] = useState(false);
   const [editingId, setEditingId] = useState(false);
   const [idValue, setIdValue] = useState('');
   const [idError, setIdError] = useState<string | null>(null);
+  const [copySuccess, setCopySuccess] = useState(false);
   const { user, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
   
@@ -96,6 +98,21 @@ export default function MyPage() {
     const c = localStorage.getItem('custom_color');
     if (c) setCustomColor(c);
   }, []);
+
+  // SNS共有メニューを外側クリックで閉じる
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showShareMenu) {
+        const target = event.target as Element;
+        if (!target.closest('[data-share-menu]')) {
+          setShowShareMenu(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showShareMenu]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -181,6 +198,15 @@ export default function MyPage() {
     }
   };
 
+  const handleShowQRModal = () => {
+    if (!publicProfileUrl) {
+      alert('QRコードを表示するには、まずIDカードのIDを設定してください。');
+      setEditingId(true);
+      return;
+    }
+    setShowQRModal(true);
+  };
+
   const handleVariantChange = (v: string) => {
     setCardVariant(v as 'pasmo' | 'credit' | 'corporate' | 'metro' | 'custom');
     localStorage.setItem('card_variant', v);
@@ -213,6 +239,73 @@ export default function MyPage() {
 
   const publicProfileUrl = profile?.custom_id ? `${window.location.origin}/preview?id=${profile.custom_id}` : null;
 
+  const handleShareLink = async () => {
+    if (!publicProfileUrl) {
+      // カスタムIDが設定されていない場合の処理
+      alert('公開ページのリンクを共有するには、まずIDカードのIDを設定してください。');
+      setEditingId(true);
+      return;
+    }
+    
+    // SNS共有メニューの表示/非表示を切り替え
+    setShowShareMenu(!showShareMenu);
+  };
+
+  const handleCopyLink = async () => {
+    if (!publicProfileUrl) return;
+    
+    try {
+      await navigator.clipboard.writeText(publicProfileUrl);
+      setCopySuccess(true);
+      setShowShareMenu(false);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (error) {
+      console.error('リンクのコピーに失敗しました:', error);
+      // フォールバック: 古いブラウザ対応
+      const textArea = document.createElement('textarea');
+      textArea.value = publicProfileUrl;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        setCopySuccess(true);
+        setShowShareMenu(false);
+        setTimeout(() => setCopySuccess(false), 2000);
+      } catch (fallbackError) {
+        console.error('フォールバックコピーも失敗しました:', fallbackError);
+        alert(`リンクをコピーできませんでした。手動でコピーしてください:\n${publicProfileUrl}`);
+      }
+      document.body.removeChild(textArea);
+    }
+  };
+
+  const handleSNSShare = (platform: string) => {
+    if (!publicProfileUrl) return;
+    
+    const shareText = `${profile?.name || profile?.nickname || 'IDentry'}のプロフィールページをチェック！`;
+    let shareUrl = '';
+    
+    switch (platform) {
+      case 'twitter':
+        shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(publicProfileUrl)}`;
+        break;
+      case 'facebook':
+        shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(publicProfileUrl)}`;
+        break;
+      case 'linkedin':
+        shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(publicProfileUrl)}`;
+        break;
+      case 'line':
+        shareUrl = `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(publicProfileUrl)}`;
+        break;
+      default:
+        return;
+    }
+    
+    window.open(shareUrl, '_blank', 'width=600,height=400');
+    setShowShareMenu(false);
+  };
+
   if (authLoading || loadingProfile) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -230,8 +323,80 @@ export default function MyPage() {
               <Image src="/img/banner.png" alt="IDentry Banner" width={320} height={60} className="h-12 w-auto object-contain mx-auto" />
             </div>
             <div className="flex items-center space-x-2 absolute right-4 top-1/2 -translate-y-1/2">
-                <button onClick={() => setShowQRModal(true)} className="p-2 rounded-full hover:bg-gray-200/80 transition-colors">
-                    <QrCode className="w-6 h-6 text-gray-700" />
+                <div className="relative" data-share-menu>
+                  <button 
+                    onClick={handleShareLink}
+                    className={`p-2 rounded-full transition-colors ${
+                      publicProfileUrl 
+                        ? 'hover:bg-gray-200/80 text-gray-700' 
+                        : 'hover:bg-orange-100 text-orange-600'
+                    }`}
+                    title={publicProfileUrl ? 'SNSで共有' : 'IDを設定してSNSで共有'}
+                  >
+                    <Share className="w-6 h-6" />
+                  </button>
+                  
+                  {/* SNS共有メニュー */}
+                  {showShareMenu && publicProfileUrl && (
+                    <div className="absolute top-full right-0 mt-2 bg-white rounded-xl shadow-lg border border-gray-200 p-4 min-w-[200px] z-50">
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-gray-700 mb-3">SNSで共有</p>
+                        
+                        <button
+                          onClick={() => handleSNSShare('twitter')}
+                          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-blue-50 transition-colors"
+                        >
+                          <FaTwitter className="w-5 h-5 text-blue-500" />
+                          <span className="text-sm text-gray-700">Twitterで共有</span>
+                        </button>
+                        
+                        <button
+                          onClick={() => handleSNSShare('facebook')}
+                          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-blue-50 transition-colors"
+                        >
+                          <FaFacebook className="w-5 h-5 text-blue-600" />
+                          <span className="text-sm text-gray-700">Facebookで共有</span>
+                        </button>
+                        
+                        <button
+                          onClick={() => handleSNSShare('linkedin')}
+                          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-blue-50 transition-colors"
+                        >
+                          <FaLinkedin className="w-5 h-5 text-blue-700" />
+                          <span className="text-sm text-gray-700">LinkedInで共有</span>
+                        </button>
+                        
+                        <button
+                          onClick={() => handleSNSShare('line')}
+                          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-green-50 transition-colors"
+                        >
+                          <FaLine className="w-5 h-5 text-green-500" />
+                          <span className="text-sm text-gray-700">LINEで共有</span>
+                        </button>
+                        
+                        <div className="border-t border-gray-200 pt-2 mt-2">
+                          <button
+                            onClick={handleCopyLink}
+                            className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors"
+                          >
+                            <Copy className="w-5 h-5 text-gray-500" />
+                            <span className="text-sm text-gray-700">リンクをコピー</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <button 
+                  onClick={handleShowQRModal} 
+                  className={`p-2 rounded-full transition-colors ${
+                    publicProfileUrl 
+                      ? 'hover:bg-gray-200/80 text-gray-700' 
+                      : 'hover:bg-orange-100 text-orange-600'
+                  }`}
+                  title={publicProfileUrl ? 'QRコードを表示' : 'IDを設定してQRコードを表示'}
+                >
+                  <QrCode className="w-6 h-6" />
                 </button>
                 <button onClick={handleLogout} className="p-2 rounded-full hover:bg-gray-200/80 transition-colors">
                     <LogOut className="w-6 h-6 text-red-500" />
@@ -451,6 +616,16 @@ export default function MyPage() {
                 <p className="text-sm text-gray-600 mt-4 max-w-xs">{publicProfileUrl}</p>
                 <button onClick={() => setShowQRModal(false)} className="mt-6 bg-gray-200 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors">閉じる</button>
             </div>
+        </div>
+      )}
+
+      {/* コピー完了トースト */}
+      {copySuccess && (
+        <div className="fixed bottom-6 right-6 bg-white border border-gray-200 rounded-lg shadow-lg px-4 py-3 z-50 transition-all duration-300 ease-in-out transform translate-y-0">
+          <div className="flex items-center gap-2">
+            <span className="text-green-500">✅</span>
+            <span className="text-sm font-medium text-gray-700">コピー完了</span>
+          </div>
         </div>
       )}
     </div>
