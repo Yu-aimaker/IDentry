@@ -371,6 +371,31 @@ function CreatePage() {
     }));
   };
 
+  // 入力情報の量に基づいた進捗を計算する関数
+  const calculateProgress = () => {
+    const fields = [
+      // 必須項目（重み：2）
+      { filled: !!formData.name, weight: 2 },
+      { filled: !!(formData.birthDate || (formData.birthYear && formData.birthMonth && formData.birthDay)), weight: 2 },
+      { filled: !!formData.bio, weight: 2 },
+      
+      // 任意項目（重み：1）
+      { filled: !!formData.gender, weight: 1 },
+      { filled: !!formData.address, weight: 1 },
+      { filled: formData.education.length > 0, weight: 1 },
+      { filled: formData.career.length > 0, weight: 1 },
+      { filled: !!(formData.twitter || formData.instagram || formData.linkedin || formData.github), weight: 1 },
+      { filled: formData.skills.length > 0, weight: 1 },
+      { filled: formData.portfolio.length > 0, weight: 1 },
+      { filled: !!(formData.photo || formData.google_avatar_url), weight: 1 }
+    ];
+
+    const totalWeight = fields.reduce((sum, field) => sum + field.weight, 0);
+    const filledWeight = fields.reduce((sum, field) => sum + (field.filled ? field.weight : 0), 0);
+    
+    return Math.round((filledWeight / totalWeight) * 100);
+  };
+
   // 画像アップロード処理
   const handleImageUpload = async (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -894,7 +919,7 @@ function CreatePage() {
             <div className="w-full bg-gray-100 rounded-full h-3 shadow-inner">
               <div
                 className="bg-gradient-to-r from-blue-500 to-indigo-600 h-3 rounded-full transition-all duration-700 ease-out relative"
-                style={{ width: `${(currentStep / 10) * 100}%` }}
+                style={{ width: `${calculateProgress()}%` }}
               >
                 {/* サブトルな光沢効果 */}
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent rounded-full"></div>
@@ -904,7 +929,7 @@ function CreatePage() {
             {/* ランナーアイコン */}
             <div
               className="absolute -top-4 transform transition-all duration-700 ease-out"
-              style={{ left: `calc(${(currentStep / 10) * 100}% - 24px)` }}
+              style={{ left: `calc(${calculateProgress()}% - 24px)` }}
             >
               <div className="w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center border-2 border-blue-500 hover:scale-110 transition-transform duration-300">
                 <span className="text-2xl animate-pulse">🚀</span>
@@ -919,7 +944,7 @@ function CreatePage() {
               <span>スタート</span>
             </div>
             <div className="text-slate-700 font-semibold">
-              {Math.round((currentStep / 10) * 100)}% 完了
+              {calculateProgress()}% 完了
             </div>
             <div className="flex items-center space-x-2 text-slate-600">
               <span>ゴール</span>
