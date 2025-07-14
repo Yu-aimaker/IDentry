@@ -37,7 +37,6 @@ interface FormData {
     title: string;
     description: string;
     url: string;
-    image: string;
   }>;
 }
 
@@ -116,8 +115,7 @@ function CreatePage() {
       portfolio: profile.portfolio?.map((port) => ({
         title: port.title || '',
         description: port.description || '',
-        url: port.url || '',
-        image: port.image || ''
+        url: port.url || ''
       })) || []
     };
   };
@@ -1160,19 +1158,18 @@ function CareerInput({ career, addCareer }: {
 
 // ポートフォリオ入力コンポーネント
 function PortfolioInput({ portfolio, addPortfolio, removePortfolio }: { 
-  portfolio: Array<{ title: string; description: string; url: string; image: string }>, 
-  addPortfolio: (item: { title: string; description: string; url: string; image: string }) => void,
+  portfolio: Array<{ title: string; description: string; url: string }>, 
+  addPortfolio: (item: { title: string; description: string; url: string }) => void,
   removePortfolio: (index: number) => void
 }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [url, setUrl] = useState('');
-  const [image, setImage] = useState('');
 
   const handleAdd = () => {
     if (title.trim()) {
       // 重複チェック
-      const isDuplicate = portfolio.some(p => p.title === title.trim() && p.description === description.trim() && p.url === url.trim() && p.image === image.trim());
+      const isDuplicate = portfolio.some(p => p.title === title.trim() && p.description === description.trim() && p.url === url.trim());
       if (isDuplicate) {
         alert('同じポートフォリオが既に追加されています');
         return;
@@ -1180,13 +1177,11 @@ function PortfolioInput({ portfolio, addPortfolio, removePortfolio }: {
       addPortfolio({ 
         title: title.trim(), 
         description: description.trim(), 
-        url: url.trim(), 
-        image: image.trim() 
+        url: url.trim()
       });
       setTitle('');
       setDescription('');
       setUrl('');
-      setImage('');
     }
   };
 
@@ -1213,13 +1208,6 @@ function PortfolioInput({ portfolio, addPortfolio, removePortfolio }: {
           onChange={(e) => setUrl(e.target.value)}
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
           placeholder="作品URL（例: https://example.com）"
-        />
-        <input
-          type="url"
-          value={image}
-          onChange={(e) => setImage(e.target.value)}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-          placeholder="作品画像URL（例: https://example.com/image.jpg）"
         />
         <button
           onClick={handleAdd}

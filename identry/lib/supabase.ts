@@ -582,3 +582,23 @@ export const getProfileByCustomId = async (customId: string): Promise<Profile | 
 
   return data as Profile;
 } 
+
+/**
+ * 指定したURLのOGP画像URLを取得する
+ * @param pageUrl ページのURL
+ * @returns OGP画像のURL（取得できなければnull）
+ */
+export const fetchOgpImageUrl = async (pageUrl: string): Promise<string | null> => {
+  try {
+    // サードパーティAPI例: https://ogp.me/ ではAPIはないので、ここでは例として https://api.microlink.io を利用
+    // 商用利用や制限は各自でご確認ください
+    const res = await fetch(`https://api.microlink.io/?url=${encodeURIComponent(pageUrl)}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    // data.data.image.url などにOGP画像URLが入っている
+    return data?.data?.image?.url || null;
+  } catch (e) {
+    console.error('OGP画像取得失敗:', e);
+    return null;
+  }
+}; 
