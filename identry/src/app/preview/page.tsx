@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense, ReactElement } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
-import { getProfileByCustomId, getProfileImageUrl, Profile, getUserProfile, getFormDataLocally, fetchOgpImageUrl } from '../../../lib/supabase';
+import { getProfileByCustomId, getProfileImageUrl, Profile, getUserProfile, getFormDataLocally, getPortfolioOGPImage } from '../../../lib/supabase';
 import { useAuth } from '../../../lib/auth-context';
 import { IDCardProfile } from "../../../components/ui/IDCardProfile";
 import { motion } from "framer-motion";
@@ -38,6 +38,64 @@ interface LocalProfileData {
     url: string;
     image: string;
   }>;
+}
+
+// ポートフォリオアイテムコンポーネント
+function PortfolioItem({ portfolio }: { portfolio: { title: string; description?: string; url?: string; image?: string } }) {
+  const [ogpImage, setOgpImage] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
+
+  useEffect(() => {
+    const loadOGPImage = async () => {
+      if (portfolio.url) {
+        try {
+          const image = await getPortfolioOGPImage(portfolio.url);
+          setOgpImage(image);
+        } catch (error) {
+          console.error('OGP画像の取得に失敗しました:', error);
+        }
+      }
+    };
+
+    loadOGPImage();
+  }, [portfolio.url]);
+
+  const displayImage = portfolio.image || ogpImage;
+
+  return (
+    <a 
+      href={portfolio.url || undefined} 
+      target="_blank" 
+      rel="noopener noreferrer" 
+      className="block bg-white/60 rounded-xl border border-gray-200/80 overflow-hidden group transition-all transform hover:-translate-y-1 hover:shadow-lg"
+    >
+      {displayImage && !imageError ? (
+        <div className="relative w-full h-40 bg-gray-100">
+          <Image 
+            src={displayImage} 
+            alt={portfolio.title} 
+            fill
+            className="object-cover"
+            onError={() => setImageError(true)}
+          />
+        </div>
+      ) : (
+        <div className="w-full h-40 bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+          <FaGlobe className="text-4xl text-blue-300" />
+        </div>
+      )}
+      <div className="p-4">
+        <h4 className="font-bold text-gray-800 group-hover:text-blue-600 transition-colors">{portfolio.title}</h4>
+        <p className="text-sm text-gray-600 mt-1">{portfolio.description}</p>
+        {portfolio.url && (
+          <div className="flex items-center mt-2 text-xs text-blue-500">
+            <ExternalLink className="w-3 h-3 mr-1" />
+            <span>{portfolio.url.replace(/https?:\/\//, '')}</span>
+          </div>
+        )}
+      </div>
+    </a>
+  );
 }
 
 function Section({ title, icon, children }: { title: string, icon: ReactElement, children: React.ReactNode }) {
@@ -86,50 +144,6 @@ function SNSLinks({ twitter, instagram, linkedin, github }: { twitter?: string, 
         <p className="text-gray-500 text-sm">SNSアカウントがまだリンクされていません。</p>
       )}
     </div>
-  );
-}
-
-// ポートフォリオOGPサムネイルカード
-function PortfolioCard({ port }: { port: { title: string; description?: string; url?: string } }) {
-  const [ogpUrl, setOgpUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    let ignore = false;
-    if (!port.url) return;
-    setLoading(true);
-    fetchOgpImageUrl(port.url)
-      .then(url => {
-        if (!ignore) setOgpUrl(url);
-      })
-      .finally(() => {
-        if (!ignore) setLoading(false);
-      });
-    return () => { ignore = true; };
-  }, [port.url]);
-
-  return (
-    <a href={port.url || undefined} target="_blank" rel="noopener noreferrer" className="block bg-white/60 rounded-xl border border-gray-200/80 overflow-hidden group transition-all transform hover:-translate-y-1 hover:shadow-lg">
-      <div className="w-full h-40 bg-gray-100 flex items-center justify-center overflow-hidden">
-        {loading ? (
-          <div className="w-12 h-12 animate-pulse bg-gray-200 rounded-full" />
-        ) : ogpUrl ? (
-          <Image src={ogpUrl} alt={port.title} width={400} height={250} className="w-full h-40 object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-300 text-4xl">🌐</div>
-        )}
-      </div>
-      <div className="p-4">
-        <h4 className="font-bold text-gray-800 group-hover:text-blue-600 transition-colors">{port.title}</h4>
-        <p className="text-sm text-gray-600 mt-1">{port.description || ''}</p>
-        {port.url && (
-          <div className="flex items-center mt-2 text-xs text-blue-500">
-              <ExternalLink className="w-3 h-3 mr-1" />
-              <span>{port.url.replace(/https?:\/\//, '')}</span>
-          </div>
-        )}
-      </div>
-    </a>
   );
 }
 
@@ -472,7 +486,10 @@ function PreviewPageContent() {
               <Section title="ポートフォリオ" icon={<FaGlobe size={24} />}>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {(profile?.portfolio || localProfile?.portfolio || []).map((port, i) => (
-                        <PortfolioCard port={port} key={i} />
+                        <PortfolioItem 
+                          key={i} 
+                          portfolio={port} 
+                        />
                     ))}
                 </div>
               </Section>

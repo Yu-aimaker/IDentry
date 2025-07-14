@@ -5,8 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useAuth } from '../../../lib/auth-context';
-import { getUserProfile, updateBlockVisibility, Profile, getProfileImageUrl, uploadProfileImage, updateProfile, updateProfileVisibility, getFormDataLocally, clearFormDataLocally, updateFullProfile } from '../../../lib/supabase';
-import { fetchOgpImageUrl } from '../../../lib/supabase';
+import { getUserProfile, updateBlockVisibility, Profile, getProfileImageUrl, uploadProfileImage, updateProfile, updateProfileVisibility, getFormDataLocally, clearFormDataLocally, updateFullProfile, getPortfolioOGPImage } from '../../../lib/supabase';
 import { IDCardProfile } from "../../../components/ui/IDCardProfile";
 import { motion } from "framer-motion";
 import { FaTwitter, FaGithub, FaInstagram, FaLinkedin, FaGlobe, FaLink, FaGraduationCap, FaLightbulb, FaFacebook, FaLine } from 'react-icons/fa';
@@ -21,6 +20,58 @@ function Switch({ checked, onChange }: { checked: boolean, onChange: (checked: b
             <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
         </label>
     );
+}
+
+// ポートフォリオアイテムコンポーネント
+function PortfolioItem({ portfolio }: { portfolio: { title: string; description?: string; url?: string; image?: string } }) {
+  const [ogpImage, setOgpImage] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
+
+  useEffect(() => {
+    const loadOGPImage = async () => {
+      if (portfolio.url) {
+        try {
+          const image = await getPortfolioOGPImage(portfolio.url);
+          setOgpImage(image);
+        } catch (error) {
+          console.error('OGP画像の取得に失敗しました:', error);
+        }
+      }
+    };
+
+    loadOGPImage();
+  }, [portfolio.url]);
+
+  const displayImage = portfolio.image || ogpImage;
+
+  return (
+    <a 
+      href={portfolio.url || undefined} 
+      target="_blank" 
+      rel="noopener noreferrer" 
+      className="block bg-white/60 rounded-xl border border-gray-200/80 overflow-hidden group transition-all transform hover:-translate-y-1 hover:shadow-lg"
+    >
+      {displayImage && !imageError ? (
+        <div className="relative w-full h-40 bg-gray-100">
+          <Image 
+            src={displayImage} 
+            alt={portfolio.title} 
+            fill
+            className="object-cover"
+            onError={() => setImageError(true)}
+          />
+        </div>
+      ) : (
+        <div className="w-full h-40 bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+          <FaGlobe className="text-4xl text-blue-300" />
+        </div>
+      )}
+      <div className="p-4">
+        <h4 className="font-bold text-gray-800">{portfolio.title}</h4>
+        <p className="text-sm text-gray-600 mt-1">{portfolio.description}</p>
+      </div>
+    </a>
+  );
 }
 
 // Reusable Section with edit/visibility controls
@@ -76,44 +127,6 @@ function SNSLinks({ twitter, instagram, linkedin, github }: { twitter?: string, 
         {!sns.some(s => s.show) && <p className="text-gray-500 text-sm">SNSアカウントがまだリンクされていません。</p>}
       </div>
     );
-}
-
-// ポートフォリオOGPサムネイルカード
-function PortfolioCard({ port }: { port: { title: string; description?: string; url?: string } }) {
-  const [ogpUrl, setOgpUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    let ignore = false;
-    if (!port.url) return;
-    setLoading(true);
-    fetchOgpImageUrl(port.url)
-      .then(url => {
-        if (!ignore) setOgpUrl(url);
-      })
-      .finally(() => {
-        if (!ignore) setLoading(false);
-      });
-    return () => { ignore = true; };
-  }, [port.url]);
-
-  return (
-    <a href={port.url || undefined} target="_blank" rel="noopener noreferrer" className="block bg-white/60 rounded-xl border border-gray-200/80 overflow-hidden group transition-all transform hover:-translate-y-1 hover:shadow-lg">
-      <div className="w-full h-40 bg-gray-100 flex items-center justify-center overflow-hidden">
-        {loading ? (
-          <div className="w-12 h-12 animate-pulse bg-gray-200 rounded-full" />
-        ) : ogpUrl ? (
-          <Image src={ogpUrl} alt={port.title} width={400} height={250} className="w-full h-40 object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-300 text-4xl">🌐</div>
-        )}
-      </div>
-      <div className="p-4">
-        <h4 className="font-bold text-gray-800">{port.title}</h4>
-        <p className="text-sm text-gray-600 mt-1">{port.description || ''}</p>
-      </div>
-    </a>
-  );
 }
 
 export default function MyPage() {
@@ -637,7 +650,10 @@ export default function MyPage() {
             <Section title="ポートフォリオ" icon={<FaGlobe size={24} />} isPublic={profile?.show_portfolio} onToggleVisibility={() => handleToggleBlockVisibility('portfolio')} editHref="/create?edit=true&section=portfolio">
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-h-[120px]">
                     {profile?.portfolio && profile.portfolio.length > 0 ? profile.portfolio.map((port, i) => (
-                        <PortfolioCard port={port} key={i} />
+                        <PortfolioItem 
+                          key={i} 
+                          portfolio={port} 
+                        />
                     )) : <p className="text-gray-500 text-sm pl-2">ポートフォリオがまだ登録されていません。</p>}
                 </div>
             </Section>

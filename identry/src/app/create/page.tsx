@@ -37,6 +37,7 @@ interface FormData {
     title: string;
     description: string;
     url: string;
+    image: string;
   }>;
 }
 
@@ -115,7 +116,8 @@ function CreatePage() {
       portfolio: profile.portfolio?.map((port) => ({
         title: port.title || '',
         description: port.description || '',
-        url: port.url || ''
+        url: port.url || '',
+        image: port.image || ''
       })) || []
     };
   };
@@ -1158,8 +1160,8 @@ function CareerInput({ career, addCareer }: {
 
 // ポートフォリオ入力コンポーネント
 function PortfolioInput({ portfolio, addPortfolio, removePortfolio }: { 
-  portfolio: Array<{ title: string; description: string; url: string }>, 
-  addPortfolio: (item: { title: string; description: string; url: string }) => void,
+  portfolio: Array<{ title: string; description: string; url: string; image: string }>, 
+  addPortfolio: (item: { title: string; description: string; url: string; image: string }) => void,
   removePortfolio: (index: number) => void
 }) {
   const [title, setTitle] = useState('');
@@ -1177,7 +1179,8 @@ function PortfolioInput({ portfolio, addPortfolio, removePortfolio }: {
       addPortfolio({ 
         title: title.trim(), 
         description: description.trim(), 
-        url: url.trim()
+        url: url.trim(), 
+        image: '' // 画像は自動取得されるため空文字列
       });
       setTitle('');
       setDescription('');
@@ -1202,13 +1205,18 @@ function PortfolioInput({ portfolio, addPortfolio, removePortfolio }: {
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent resize-none"
           placeholder="作品の説明（例: React/Next.jsを使用したECサイト。決済機能まで実装）"
         />
-        <input
-          type="url"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-          placeholder="作品URL（例: https://example.com）"
-        />
+        <div className="space-y-2">
+          <input
+            type="url"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+            placeholder="作品URL（例: https://example.com）"
+          />
+          <p className="text-xs text-gray-500">
+            💡 サイトの画像は自動で取得されます
+          </p>
+        </div>
         <button
           onClick={handleAdd}
           className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"

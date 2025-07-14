@@ -583,22 +583,46 @@ export const getProfileByCustomId = async (customId: string): Promise<Profile | 
   return data as Profile;
 } 
 
-/**
- * 指定したURLのOGP画像URLを取得する
- * @param pageUrl ページのURL
- * @returns OGP画像のURL（取得できなければnull）
- */
-export const fetchOgpImageUrl = async (pageUrl: string): Promise<string | null> => {
+// OGP画像を取得する関数
+export const fetchOGPImage = async (url: string): Promise<string | null> => {
+  if (!url) return null;
+  
   try {
-    // サードパーティAPI例: https://ogp.me/ ではAPIはないので、ここでは例として https://api.microlink.io を利用
-    // 商用利用や制限は各自でご確認ください
-    const res = await fetch(`https://api.microlink.io/?url=${encodeURIComponent(pageUrl)}`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    // data.data.image.url などにOGP画像URLが入っている
-    return data?.data?.image?.url || null;
-  } catch (e) {
-    console.error('OGP画像取得失敗:', e);
+    // URLが有効かチェック
+    const validUrl = url.startsWith('http') ? url : `https://${url}`;
+    
+    // OGP取得APIを呼び出し（Next.jsのAPIルートを使用）
+    const response = await fetch(`/api/ogp?url=${encodeURIComponent(validUrl)}`);
+    
+    if (!response.ok) {
+      console.error('OGP取得エラー:', response.status);
+      return null;
+    }
+    
+    const data = await response.json();
+    return data.image || null;
+  } catch (error) {
+    console.error('OGP画像取得エラー:', error);
     return null;
   }
+};
+
+// ポートフォリオのOGP画像をキャッシュ付きで取得
+const ogpCache = new Map<string, string | null>();
+
+export const getPortfolioOGPImage = async (url: string): Promise<string | null> => {
+  if (!url) return null;
+  
+  // キャッシュから確認
+  if (ogpCache.has(url)) {
+    return ogpCache.get(url) || null;
+  }
+  
+  // OGP画像を取得
+  const ogpImage = await fetchOGPImage(url);
+  
+  // キャッシュに保存
+  ogpCache.set(url, ogpImage);
+  
+  return ogpImage;
 }; 
