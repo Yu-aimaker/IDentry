@@ -266,10 +266,8 @@ const IDCardProfile = React.forwardRef<HTMLDivElement, IDCardProfileProps>(
 
     // Hydrationエラー防止: 日付はクライアント側でのみ生成
     const [issueDate, setIssueDate] = React.useState('');
-    const [expireDate, setExpireDate] = React.useState('');
     React.useEffect(() => {
       setIssueDate(new Date().toLocaleDateString('ja-JP'));
-      setExpireDate(new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toLocaleDateString('ja-JP'));
     }, []);
 
     React.useEffect(() => {
@@ -546,7 +544,6 @@ const IDCardProfile = React.forwardRef<HTMLDivElement, IDCardProfileProps>(
           <h4 className="font-semibold mb-2 text-foreground">詳細情報</h4>
           <div className="space-y-1 text-sm text-muted-foreground">
             <div>発行日: {issueDate || '--'}</div>
-            <div>有効期限: {expireDate || '--'}</div>
           </div>
         </motion.div>
       </div>
