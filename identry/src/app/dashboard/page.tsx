@@ -421,6 +421,9 @@ export default function MyPage() {
                 joinDate: profile?.created_at ? new Date(profile.created_at).toLocaleDateString('ja-JP') : "",
                 email: user?.email || "",
                 avatar: getProfileImageUrl(profile) || undefined,
+                birthDate: profile?.birth_date || '',
+                gender: profile?.gender || '',
+                address: profile?.address || '',
               }}
               variant={cardVariant}
               onVariantChange={handleVariantChange}

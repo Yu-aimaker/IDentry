@@ -18,6 +18,9 @@ interface ProfileCardData {
   avatar?: string
   joinDate: string
   email: string
+  birthDate?: string | null
+  gender?: string | null
+  address?: string | null
 }
 
 interface IDCardProfileProps {
@@ -544,6 +547,14 @@ const IDCardProfile = React.forwardRef<HTMLDivElement, IDCardProfileProps>(
           <h4 className="font-semibold mb-2 text-foreground">詳細情報</h4>
           <div className="space-y-1 text-sm text-muted-foreground">
             <div>発行日: {issueDate || '--'}</div>
+            {/* マイページ用: 生年月日・性別・住所（profileDataにあれば表示） */}
+            {profileData && (
+              <>
+                {profileData.birthDate !== undefined && <div>生年月日: {profileData.birthDate || '--'}</div>}
+                {profileData.gender !== undefined && <div>性別: {profileData.gender || '--'}</div>}
+                {profileData.address !== undefined && <div>住所: {profileData.address || '--'}</div>}
+              </>
+            )}
           </div>
         </motion.div>
       </div>
