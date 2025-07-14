@@ -39,7 +39,7 @@ export default function Home() {
           <DotLottieReact
             src="/lottie/Animation LottieFiles.lottie"
             autoplay
-            speed={0.6}
+            speed={1.0}
             style={{ width: '250px', height: '250px' }}
           />
         </div>

@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IDentry 最終発表 - デジタルポートフォリオサービス</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2563eb',
+                        accent: '#3b82f6'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap');
+        
+        body {
+            font-family: "Noto Sans JP", sans-serif;
+        }
+        
+        .slide {
+            min-height: 100vh;
+            padding: 60px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.8s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .hover-card {
+            transition: all 0.3s ease;
+        }
+        
+        .hover-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        
+        .scroll-smooth {
+            scroll-behavior: smooth;
+        }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+    </style>
+</head>
+<body class="bg-white text-gray-900 scroll-smooth">
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 left-0 right-0 bg-white/90 backdrop-blur-md z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center space-x-4">
+                    <img src="../identry/public/img/banner.png" alt="IDentry ロゴバナー" style="height:40px; width:auto;" />
+                    <!-- <div class="text-2xl font-bold text-primary">IDentry</div>
+                    <div class="text-sm text-gray-500">最終発表</div> -->
+                </div>
+                <div class="hidden md:flex space-x-6">
+                    <a href="#title" class="text-gray-600 hover:text-primary transition-colors">概要</a>
+                    <a href="#problem" class="text-gray-600 hover:text-primary transition-colors">課題</a>
+                    <a href="#target" class="text-gray-600 hover:text-primary transition-colors">価値提供</a>
+                    <a href="#features" class="text-gray-600 hover:text-primary transition-colors">機能実装</a>
+                    <a href="#teamwork" class="text-gray-600 hover:text-primary transition-colors">チーム開発</a>
+                    <a href="#summary" class="text-gray-600 hover:text-primary transition-colors">まとめ</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Title Slide -->
+    <section id="title" class="slide bg-gradient-to-br from-blue-50 to-white">
+        <div class="text-center max-w-5xl mx-auto px-6 fade-in">
+            <img src="../identry/public/img/favicon.png" alt="IDentry Logo" width="120" height="120" class="mx-auto mb-6 object-cover rounded-lg" />
+            <h1 class="text-6xl md:text-8xl font-bold mb-8">
+                <span style="color:#111">ID</span><span style="color:#2563eb">entry</span>
+            </h1>
+            <h2 class="text-3xl md:text-4xl font-light mb-8 text-gray-700">最終発表</h2>
+            <p class="text-xl md:text-2xl mb-12 text-gray-600 leading-relaxed max-w-3xl mx-auto">
+                就活生のめんどくさいを解決する<br />
+                デジタルポートフォリオサービス
+            </p>
+            <div class="inline-flex items-center px-10 py-5 bg-primary text-white rounded-xl font-semibold text-xl shadow-lg">
+                🎓 チーム開発プロジェクト完成
+            </div>
+            <div class="mt-10">
+                <a href="https://www.identry.me/" target="_blank" rel="noopener noreferrer"
+                    class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-4 rounded-full text-lg shadow-lg transition-all duration-200">
+                    サービスサイトを見る
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Problem & Inspiration -->
+    <section id="problem" class="slide bg-white">
+        <div class="max-w-6xl mx-auto px-6">
+            <div class="text-center mb-16 fade-in">
+                <h2 class="text-5xl font-bold mb-6 text-gray-900">💡 課題と着想</h2>
+                <p class="text-xl text-gray-600">なぜこのプロダクトを作ろうと思ったのか</p>
+            </div>
+            
+            <div class="grid lg:grid-cols-2 gap-16 items-center">
+                <div class="space-y-8">
+                    <div class="hover-card bg-red-50 border-l-4 border-red-400 rounded-xl p-8">
+                        <h3 class="text-2xl font-bold text-red-600 mb-4">😰 発見した課題</h3>
+                        <ul class="space-y-3 text-gray-700 text-lg">
+                            <li>• 就活でのマイページ登録が毎回めんどくさい</li>
+                            <li>• 同じ情報を何度も入力する無駄</li>
+                            <li>• 各サービスで情報が分散して管理が大変</li>
+                            <li>• 自己紹介の機会でURLひとつで済ませたい</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="hover-card bg-blue-50 border-l-4 border-blue-400 rounded-xl p-8">
+                        <h3 class="text-2xl font-bold text-blue-600 mb-4">🎯 着想のポイント</h3>
+                        <p class="text-gray-700 text-lg leading-relaxed">
+                            「一度作れば、どこでも使える」<br />
+                            そんなデジタル名刺のようなサービスがあれば、
+                            就活生だけでなく学生や社会人の自己紹介も楽になるはず。
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="text-center">
+                    <div class="bg-gray-50 rounded-3xl p-12 shadow-lg">
+                        <div class="text-8xl mb-6">🤔</div>
+                        <h3 class="text-3xl font-bold text-gray-800 mb-4">毎回同じ情報を<br />入力するの、面倒じゃない？</h3>
+                        <div class="text-6xl mt-8">⬇️</div>
+                        <div class="text-6xl mt-4">💡</div>
+                        <p class="text-xl text-primary font-semibold mt-4">IDentryで解決！</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Target & Value -->
+    <section id="target" class="slide bg-gray-50">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="text-center mb-16 fade-in">
+                <h2 class="text-5xl font-bold mb-6 text-gray-900">🎯 ターゲットと価値提供</h2>
+                <p class="text-xl text-gray-600">誰に、どんな価値を提供するか</p>
+            </div>
+            
+            <div class="grid lg:grid-cols-3 gap-10">
+                <div class="hover-card bg-white rounded-3xl p-10 shadow-lg">
+                    <div class="text-5xl mb-6 text-center">🎓</div>
+                    <h3 class="text-2xl font-bold text-primary mb-6 text-center">就活生</h3>
+                    <div class="space-y-4 text-gray-700">
+                        <div class="bg-blue-50 rounded-lg p-4">
+                            <p class="font-semibold text-blue-700">提供価値</p>
+                            <p class="text-sm">企業への登録作業を大幅短縮</p>
+                        </div>
+                        <ul class="space-y-2 text-sm">
+                            <li>• マイページ登録の手間を削減</li>
+                            <li>• 一貫したプロフィール管理</li>
+                            <li>• ポートフォリオの一元化</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="hover-card bg-white rounded-3xl p-10 shadow-lg">
+                    <div class="text-5xl mb-6 text-center">👨‍💼</div>
+                    <h3 class="text-2xl font-bold text-primary mb-6 text-center">社会人</h3>
+                    <div class="space-y-4 text-gray-700">
+                        <div class="bg-blue-50 rounded-lg p-4">
+                            <p class="font-semibold text-blue-700">提供価値</p>
+                            <p class="text-sm">デジタル名刺として活用</p>
+                        </div>
+                        <ul class="space-y-2 text-sm">
+                            <li>• 営業活動での自己紹介効率化</li>
+                            <li>• SNSリンクの一括管理</li>
+                            <li>• プロフェッショナルな印象</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="hover-card bg-white rounded-3xl p-10 shadow-lg">
+                    <div class="text-5xl mb-6 text-center">🎨</div>
+                    <h3 class="text-2xl font-bold text-primary mb-6 text-center">クリエイター</h3>
+                    <div class="space-y-4 text-gray-700">
+                        <div class="bg-blue-50 rounded-lg p-4">
+                            <p class="font-semibold text-blue-700">提供価値</p>
+                            <p class="text-sm">作品を魅力的に展示</p>
+                        </div>
+                        <ul class="space-y-2 text-sm">
+                            <li>• ポートフォリオサイト代替</li>
+                            <li>• 作品と経歴の統合表示</li>
+                            <li>• 簡単な情報更新</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-16 text-center">
+                <div class="inline-block bg-primary text-white rounded-2xl px-12 py-8 shadow-lg">
+                    <h4 class="text-2xl font-bold mb-4">🌟 共通価値</h4>
+                    <p class="text-xl">「自分のすべてを、ひとつのURLに」</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features & Implementation -->
+    <section id="features" class="slide bg-white">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="text-center mb-16 fade-in">
+                <h2 class="text-5xl font-bold mb-6 text-gray-900">⚙️ 機能計画と実装状況</h2>
+                <p class="text-xl text-gray-600">どんな機能を計画し、どこまで実装できたか</p>
+            </div>
+            
+            <div class="grid lg:grid-cols-2 gap-16">
+                <div>
+                    <h3 class="text-3xl font-bold text-primary mb-8">📋 計画した機能</h3>
+                    <div class="space-y-6">
+                        <div class="hover-card bg-blue-50 rounded-xl p-6">
+                            <h4 class="font-bold text-lg text-blue-700 mb-2">🎯 コア機能</h4>
+                            <ul class="space-y-2 text-gray-700">
+                                <li>• 簡単プロフィール入力（10ステップ）</li>
+                                <li>• 美しいページ自動生成</li>
+                                <li>• SNSリンク一括管理</li>
+                                <li>• ポートフォリオ表示</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="hover-card bg-green-50 rounded-xl p-6">
+                            <h4 class="font-bold text-lg text-green-700 mb-2">🔐 認証・管理</h4>
+                            <ul class="space-y-2 text-gray-700">
+                                <li>• Google/メール認証</li>
+                                <li>• データの永続化</li>
+                                <li>• プライバシー設定</li>
+                                <li>• ダッシュボード管理</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="hover-card bg-purple-50 rounded-xl p-6">
+                            <h4 class="font-bold text-lg text-purple-700 mb-2">📱 UX強化</h4>
+                            <ul class="space-y-2 text-gray-700">
+                                <li>• レスポンシブデザイン</li>
+                                <li>• アニメーション演出</li>
+                                <li>• プレビュー機能</li>
+                                <li>• QRコード生成</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <div>
+                    <h3 class="text-3xl font-bold text-green-600 mb-8">✅ 実装完了状況</h3>
+                    <div class="space-y-6">
+                        <div class="bg-green-50 border-l-4 border-green-400 rounded-xl p-6">
+                            <h4 class="font-bold text-lg text-green-700 mb-4">🎉 完全実装済み</h4>
+                            <div class="grid grid-cols-2 gap-3 text-sm">
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                                    <span>プロフィール入力</span>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                                    <span>ページ生成</span>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                                    <span>認証システム</span>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                                    <span>データベース</span>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                                    <span>レスポンシブ</span>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                                    <span>プレビュー</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-yellow-50 border-l-4 border-yellow-400 rounded-xl p-6">
+                            <h4 class="font-bold text-lg text-yellow-700 mb-4">🔧 課題・改善点</h4>
+                            <ul class="space-y-2 text-gray-700 text-sm">
+                                <li>• Chrome拡張機能の実装（プラスアルファ機能）</li>
+                                <li>• AI APIを用いた有料機能およびStripeの導入</li>
+                                <li>• SNS運用などのマネタイズ</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="bg-primary text-white rounded-xl p-6 text-center">
+                            <h4 class="font-bold text-xl mb-2">🎯 実装完了度</h4>
+                            <div class="text-4xl font-bold">100%</div>
+                            <p class="text-sm opacity-90">基本機能はすべて実装済み（QRコード生成も利用可能）</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Team Development -->
+    <section id="teamwork" class="slide bg-gradient-to-br from-blue-50 to-indigo-50">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="text-center mb-16 fade-in">
+                <h2 class="text-5xl font-bold mb-6 text-gray-900">🤝 チーム開発の工夫</h2>
+                <p class="text-xl text-gray-600 font-semibold">生産性を高めるために取り組んだ主な工夫</p>
+            </div>
+            
+            <div class="grid lg:grid-cols-2 gap-16 mb-16">
+                <div class="hover-card bg-white rounded-3xl p-10 shadow-lg">
+                    <div class="text-5xl mb-6">📋</div>
+                    <h3 class="text-3xl font-bold text-primary mb-6">Notion活用で役割明確化</h3>
+                    <div class="space-y-6">
+                        <div class="bg-blue-50 rounded-xl p-6">
+                            <h4 class="font-bold text-blue-700 mb-3">🎯 開発フローの構造化</h4>
+                            <ul class="space-y-2 text-gray-700">
+                                <li>• 各メンバーの役割と責任を明文化</li>
+                                <li>• タスクの進捗を可視化</li>
+                                <li>• 定期的な振り返りと改善</li>
+                            </ul>
+                        </div>
+                        <div class="bg-green-50 rounded-xl p-6">
+                            <h4 class="font-bold text-green-700 mb-3">📊 効果</h4>
+                            <p class="text-gray-700">チーム内での情報共有が劇的に向上し、重複作業やコミュニケーションコストを大幅削減</p>
+                        </div>
+                        <div class="mt-4">
+                            <a href="https://www.notion.so/IDentry-20670c18d3d080b2bd8ef08b852b8103?source=copy_link" target="_blank" rel="noopener noreferrer"
+                                class="inline-block bg-blue-500 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-full text-base shadow-md transition-all duration-200">
+                                Notion共同作業ページを見る
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="hover-card bg-white rounded-3xl p-10 shadow-lg">
+                    <div class="text-5xl mb-6">📝</div>
+                    <h3 class="text-3xl font-bold text-primary mb-6">徹底的な要件定義</h3>
+                    <div class="space-y-6">
+                        <div class="bg-purple-50 rounded-xl p-6">
+                            <h4 class="font-bold text-purple-700 mb-3">🔍 詳細設計に注力</h4>
+                            <ul class="space-y-2 text-gray-700">
+                                <li>• 機能要件の詳細定義</li>
+                                <li>• UI/UX要件の具体化</li>
+                                <li>• ユーザーフローの設計</li>
+                            </ul>
+                        </div>
+                        <div class="bg-orange-50 rounded-xl p-6">
+                            <h4 class="font-bold text-orange-700 mb-3">⏱️ 時間配分</h4>
+                            <p class="text-gray-700">開発全体の<span class="font-bold text-orange-600">40%</span>を要件定義に投資</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="grid lg:grid-cols-2 gap-16">
+                <div class="hover-card bg-white rounded-3xl p-10 shadow-lg">
+                    <div class="text-5xl mb-6">🔄</div>
+                    <h3 class="text-3xl font-bold text-primary mb-6">継続的改善サイクル</h3>
+                    <div class="space-y-6">
+                        <div class="bg-indigo-50 rounded-xl p-6">
+                            <h4 class="font-bold text-indigo-700 mb-3">🎯 MVPからの改善</h4>
+                            <p class="text-gray-700 mb-3">最小機能から始めて、チーム内で何度もフィードバック改善を実施</p>
+                            <div class="flex items-center space-x-2 text-sm text-indigo-600">
+                                <div class="w-2 h-2 bg-indigo-500 rounded-full"></div>
+                                <span>週2-3回のレビューサイクル</span>
+                            </div>
+                        </div>
+                        <div class="bg-pink-50 rounded-xl p-6">
+                            <h4 class="font-bold text-pink-700 mb-3">👥 外部フィードバック</h4>
+                            <p class="text-gray-700">授業後半では他チーム・先生・TAからの意見も積極的に収集</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="hover-card bg-white rounded-3xl p-10 shadow-lg">
+                    <div class="text-5xl mb-6">📈</div>
+                    <h3 class="text-3xl font-bold text-primary mb-6">成果と学び</h3>
+                    <div class="space-y-6">
+                        <div class="bg-emerald-50 rounded-xl p-6">
+                            <h4 class="font-bold text-emerald-700 mb-3">🏆 定量的成果</h4>
+                            <div class="grid grid-cols-2 gap-4 text-sm">
+                                <div class="text-center">
+                                    <div class="text-2xl font-bold text-emerald-600">100%</div>
+                                    <p class="text-gray-600">機能実装完了率</p>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-2xl font-bold text-emerald-600">0件</div>
+                                    <p class="text-gray-600">重大なデザイン変更</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-blue-100 rounded-xl p-6">
+                            <h4 class="font-bold text-blue-700 mb-3">🧠 チームとしての学び</h4>
+                            <p class="text-gray-700 text-sm">
+                                要件定義への時間投資とフィードバックサイクルの重要性を実感。
+                                チーム開発における<span class="font-bold">コミュニケーション設計</span>の価値を体験。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="grid lg:grid-cols-2 gap-16 mt-16">
+                <div class="hover-card bg-white rounded-3xl p-10 shadow-lg">
+                    <div class="text-5xl mb-6">🎓</div>
+                    <h3 class="text-3xl font-bold text-primary mb-6">知識レベルの差を埋める工夫</h3>
+                    <div class="space-y-6">
+                        <div class="bg-yellow-50 rounded-xl p-6">
+                            <h4 class="font-bold text-yellow-700 mb-3">📚 ナレッジ差分の解消</h4>
+                            <p class="text-gray-700 mb-3">WEBアプリの基本知識を知識のないメンバーに共有</p>
+                            <ul class="space-y-1 text-sm text-gray-600">
+                                <li>• AIコーディングのノウハウを共通レベルまで引き上げ</li>
+                                <li>• AIに作成させるコツや要件スタックの共有</li>
+                            </ul>
+                        </div>
+                        <div class="bg-green-50 rounded-xl p-6">
+                            <h4 class="font-bold text-green-700 mb-3">⚡ 効果</h4>
+                            <p class="text-gray-700 text-sm">全メンバーが開発に参加できる環境を構築し、チーム全体の生産性向上を実現</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="hover-card bg-white rounded-3xl p-10 shadow-lg">
+                    <div class="text-5xl mb-6">⚖️</div>
+                    <h3 class="text-3xl font-bold text-primary mb-6">現実的な役割分担</h3>
+                    <div class="space-y-6">
+                        <div class="bg-red-50 rounded-xl p-6">
+                            <h4 class="font-bold text-red-700 mb-3">🎯 品質重視の分担</h4>
+                            <p class="text-gray-700 mb-3">プロダクトの質を下げないため、知見レベルに応じた役割設計</p>
+                            <ul class="space-y-1 text-sm text-gray-600">
+                                <li>• 最も知見のあるメンバーが技術主導</li>
+                                <li>• 他メンバーは要件定義・FB・デザイン案を担当</li>
+                            </ul>
+                        </div>
+                        <div class="bg-purple-50 rounded-xl p-6">
+                            <h4 class="font-bold text-purple-700 mb-3">🤝 全員参加</h4>
+                            <p class="text-gray-700 text-sm">コードレビューとコミットは全員が実施し、学習機会を確保</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Summary -->
+    <section id="summary" class="slide bg-gradient-to-br from-blue-600 to-indigo-600 text-white">
+        <div class="max-w-6xl mx-auto px-6 text-center">
+            <div class="mb-16 fade-in">
+                <h2 class="text-5xl font-bold mb-6">🎉 まとめ</h2>
+                <p class="text-xl opacity-90">チーム開発で実現した価値</p>
+            </div>
+            
+            <div class="grid md:grid-cols-3 gap-10 mb-16">
+                <div class="bg-white/10 backdrop-blur-md rounded-3xl p-8">
+                    <div class="text-4xl mb-4">🎯</div>
+                    <h3 class="text-2xl font-bold mb-4">課題解決</h3>
+                    <p class="opacity-90">就活生の「めんどくさい」を技術で解決</p>
+                </div>
+                
+                <div class="bg-white/10 backdrop-blur-md rounded-3xl p-8">
+                    <div class="text-4xl mb-4">🔧</div>
+                    <h3 class="text-2xl font-bold mb-4">技術実装</h3>
+                    <p class="opacity-90">モダンな技術スタックで実用的なサービスを構築</p>
+                </div>
+                
+                <div class="bg-white/10 backdrop-blur-md rounded-3xl p-8">
+                    <div class="text-4xl mb-4">🤝</div>
+                    <h3 class="text-2xl font-bold mb-4">チーム開発</h3>
+                    <p class="opacity-90">要件定義とフィードバックサイクルで高品質を実現</p>
+                </div>
+            </div>
+            
+            <div class="bg-white text-gray-900 rounded-3xl p-12 max-w-4xl mx-auto">
+                <h3 class="text-4xl font-bold mb-6 text-primary">IDentry</h3>
+                <p class="text-xl text-gray-700 leading-relaxed mb-8">
+                    「自分のすべてを、ひとつのURLに」<br />
+                    ユーザー体験を最優先に設計した、実用的なデジタルポートフォリオサービス
+                </p>
+                <div class="inline-flex items-center space-x-4 mb-8">
+                    <div class="text-3xl">🚀</div>
+                    <span class="text-lg font-semibold text-gray-800">チーム開発プロジェクト完成</span>
+                </div>
+                <div class="mt-6">
+                    <a href="https://www.identry.me/" target="_blank" rel="noopener noreferrer"
+                        class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-4 rounded-full text-lg shadow-lg transition-all duration-200">
+                        サービスサイトを見る
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Simple JavaScript -->
+    <script>
+        // Smooth scrolling for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Add fade-in animation on scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('fade-in');
+                }
+            });
+        }, observerOptions);
+
+        // Observe all sections
+        document.querySelectorAll('section').forEach(section => {
+            observer.observe(section);
+        });
+
+        // Keyboard navigation
+        document.addEventListener('keydown', function(e) {
+            const sections = document.querySelectorAll('section');
+            const currentSection = getCurrentSection();
+            let targetIndex = -1;
+
+            if (e.key === 'ArrowDown' || e.key === ' ') {
+                e.preventDefault();
+                targetIndex = Math.min(currentSection + 1, sections.length - 1);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                targetIndex = Math.max(currentSection - 1, 0);
+            }
+
+            if (targetIndex >= 0) {
+                sections[targetIndex].scrollIntoView({ behavior: 'smooth' });
+            }
+        });
+
+        function getCurrentSection() {
+            const sections = document.querySelectorAll('section');
+            const scrollPosition = window.scrollY + window.innerHeight / 2;
+            
+            for (let i = sections.length - 1; i >= 0; i--) {
+                if (sections[i].offsetTop <= scrollPosition) {
+                    return i;
+                }
+            }
+            return 0;
+        }
+    </script>
+<script>
+// ヘッダー自動非表示・再表示
+(function() {
+    let lastScrollY = window.scrollY;
+    const nav = document.querySelector('nav');
+    let ticking = false;
+    let hidden = false;
+
+    function onScroll() {
+        if (!ticking) {
+            window.requestAnimationFrame(() => {
+                const currentScrollY = window.scrollY;
+                if (currentScrollY > lastScrollY && currentScrollY > 60) {
+                    // 下スクロールで非表示
+                    if (!hidden) {
+                        nav.style.transform = 'translateY(-100%)';
+                        nav.style.transition = 'transform 0.3s';
+                        hidden = true;
+                    }
+                } else {
+                    // 上スクロールで表示
+                    if (hidden) {
+                        nav.style.transform = 'translateY(0)';
+                        nav.style.transition = 'transform 0.3s';
+                        hidden = false;
+                    }
+                }
+                lastScrollY = currentScrollY;
+                ticking = false;
+            });
+            ticking = true;
+        }
+    }
+    window.addEventListener('scroll', onScroll);
+})();
+</script>
+</body>
+</html> 

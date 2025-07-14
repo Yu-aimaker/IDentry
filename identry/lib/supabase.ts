@@ -469,53 +469,62 @@ export const updateFullProfile = async (profileData: {
 
     // 新しい学歴を追加
     if (education && education.length > 0) {
-      const educationData = education
+      const uniqueEducation = education.filter((edu, idx, arr) =>
+        arr.findIndex((e) => e.school === edu.school && e.degree === edu.degree && e.year === edu.year) === idx
+      );
+      const educationData = uniqueEducation
         .filter(edu => edu.school) // 空の学校名は除外
         .map(edu => ({
           profile_id: profile.id,
           school: edu.school,
           degree: edu.degree || '',
           year: edu.year || ''
-        }))
+        }));
       
       if (educationData.length > 0) {
         const { error: educationError } = await supabase
           .from('education')
-          .insert(educationData)
+          .insert(educationData);
         
         if (educationError) {
-          console.error('学歴追加エラー:', educationError)
-          throw new Error(`学歴の追加に失敗しました: ${educationError.message}`)
+          console.error('学歴追加エラー:', educationError);
+          throw new Error(`学歴の追加に失敗しました: ${educationError.message}`);
         }
       }
     }
 
     // 新しい職歴を追加
     if (career && career.length > 0) {
-      const careerData = career
+      const uniqueCareer = career.filter((car, idx, arr) =>
+        arr.findIndex((c) => c.company === car.company && c.position === car.position && c.period === car.period) === idx
+      );
+      const careerData = uniqueCareer
         .filter(car => car.company) // 空の会社名は除外
         .map(car => ({
           profile_id: profile.id,
           company: car.company,
           position: car.position || '',
           period: car.period || ''
-        }))
+        }));
       
       if (careerData.length > 0) {
         const { error: careerError } = await supabase
           .from('career')
-          .insert(careerData)
+          .insert(careerData);
         
         if (careerError) {
-          console.error('職歴追加エラー:', careerError)
-          throw new Error(`職歴の追加に失敗しました: ${careerError.message}`)
+          console.error('職歴追加エラー:', careerError);
+          throw new Error(`職歴の追加に失敗しました: ${careerError.message}`);
         }
       }
     }
 
     // 新しいポートフォリオを追加
     if (portfolio && portfolio.length > 0) {
-      const portfolioData = portfolio
+      const uniquePortfolio = portfolio.filter((port, idx, arr) =>
+        arr.findIndex((p) => p.title === port.title && p.description === port.description && p.url === port.url && p.image === port.image) === idx
+      );
+      const portfolioData = uniquePortfolio
         .filter(port => port.title) // 空のタイトルは除外
         .map(port => ({
           profile_id: profile.id,
@@ -523,16 +532,16 @@ export const updateFullProfile = async (profileData: {
           description: port.description || '',
           url: port.url || '',
           image: port.image || ''
-        }))
+        }));
       
       if (portfolioData.length > 0) {
         const { error: portfolioError } = await supabase
           .from('portfolio')
-          .insert(portfolioData)
+          .insert(portfolioData);
         
         if (portfolioError) {
-          console.error('ポートフォリオ追加エラー:', portfolioError)
-          throw new Error(`ポートフォリオの追加に失敗しました: ${portfolioError.message}`)
+          console.error('ポートフォリオ追加エラー:', portfolioError);
+          throw new Error(`ポートフォリオの追加に失敗しました: ${portfolioError.message}`);
         }
       }
     }

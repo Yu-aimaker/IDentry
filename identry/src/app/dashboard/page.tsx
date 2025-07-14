@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, ReactElement } from 'react';
+import { useState, useEffect, ReactElement, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -91,6 +91,7 @@ export default function MyPage() {
   
   const [cardVariant, setCardVariant] = useState<'pasmo' | 'credit' | 'corporate' | 'metro' | 'custom'>('pasmo');
   const [customColor, setCustomColor] = useState('#8B5CF6');
+  const hasSaved = useRef(false);
   
   useEffect(() => {
     const v = localStorage.getItem('card_variant') as 'pasmo' | 'credit' | 'corporate' | 'metro' | 'custom' | null;
@@ -127,7 +128,8 @@ export default function MyPage() {
         
         // Google認証後のローカルストレージ保存処理をチェック
         const shouldSaveFormData = localStorage.getItem('pending_form_data_save');
-        if (shouldSaveFormData) {
+        if (shouldSaveFormData && !hasSaved.current) {
+          hasSaved.current = true;
           const formData = getFormDataLocally();
           if (formData) {
             try {
