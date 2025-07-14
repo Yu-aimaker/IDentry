@@ -463,15 +463,6 @@ export default function MyPage() {
                 />
                 <span className="text-sm font-medium text-gray-600">{profile?.is_public ? '公開中' : '非公開'}</span>
               </div>
-              {/* 詳細情報（本人のみ表示） */}
-              <div className="bg-white/80 border border-gray-200 rounded-xl p-4 mb-4">
-                <h4 className="font-semibold mb-2 text-gray-700">詳細情報（本人のみ表示）</h4>
-                <div className="space-y-1 text-sm text-gray-600">
-                  <div>生年月日: {profile?.birth_date || '--'}</div>
-                  <div>性別: {profile?.gender || '--'}</div>
-                  <div>住所: {profile?.address || '--'}</div>
-                </div>
-              </div>
               {publicProfileUrl ? (
                 <a 
                   href={publicProfileUrl} 
